@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 
 use std::cell::RefCell;
+use std::fmt::Debug;
 use std::io::Write;
 
 #[derive(Clone, Debug, Default, PartialEq, PartialOrd, clap::ValueEnum)]
@@ -21,6 +22,14 @@ pub struct Printer {
     lock: RefCell<std::io::StdoutLock<'static>>,
 }
 
+impl Debug for Printer {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Printer")
+            .field("log_level", &self.log_level)
+            .finish()
+    }
+}
+
 impl Printer {
     pub fn new(log_level: &LogLevel) -> Self {
         let result = Self {
@@ -36,7 +45,10 @@ impl Printer {
         write!(
             self.lock.borrow_mut(),
             "{} {}",
-            ansi_term::Style::new().on(ansi_term::Colour::Blue).fg(ansi_term::Colour::White).paint("Processing >>> "),
+            ansi_term::Style::new()
+                .on(ansi_term::Color::Blue)
+                .fg(ansi_term::Color::White)
+                .paint("Processing >>> "),
             self.headlines.borrow().join(" / ")
         )
         .unwrap();
@@ -72,7 +84,7 @@ impl Printer {
         self.print_headline(
             1,
             quiet,
-            &format!("\n\n{}", ansi_term::Colour::Red.paint("******")),
+            &format!("\n\n{}", ansi_term::Color::Red.paint("*******")),
             &format!("{}", ansi_term::Style::new().bold().paint(message)),
         );
     }
@@ -82,7 +94,7 @@ impl Printer {
         self.print_headline(
             2,
             quiet,
-            &format!("\n{}", ansi_term::Colour::Red.paint("++++++")),
+            &format!("\n{}", ansi_term::Color::Red.paint("+++++++")),
             message,
         );
     }
@@ -92,7 +104,7 @@ impl Printer {
         self.print_headline(
             3,
             quiet,
-            &format!("{}", ansi_term::Colour::Green.paint("------")),
+            &format!("{}", ansi_term::Color::Green.paint("-------")),
             message,
         );
     }
@@ -101,7 +113,7 @@ impl Printer {
     pub fn error(&self, message: &str) {
         if self.log_level >= LogLevel::Error {
             self.print_formatted(
-                &format!("{}:", ansi_term::Colour::Red.paint("ERROR")),
+                &format!(" {}:", ansi_term::Color::Red.paint("ERROR")),
                 message,
             );
         }
@@ -111,7 +123,7 @@ impl Printer {
     pub fn warn(&self, message: &str) {
         if self.log_level >= LogLevel::Warn {
             self.print_formatted(
-                &format!("{}:", ansi_term::Colour::Yellow.paint(" WARN")),
+                &format!(" {} :", ansi_term::Color::Yellow.paint("WARN")),
                 message,
             );
         }
@@ -121,7 +133,7 @@ impl Printer {
     pub fn info(&self, message: &str) {
         if self.log_level >= LogLevel::Info {
             self.print_formatted(
-                &format!("{}:", ansi_term::Colour::Blue.paint(" INFO")),
+                &format!(" {} :", ansi_term::Color::Blue.paint("INFO")),
                 message,
             );
         }
@@ -131,7 +143,7 @@ impl Printer {
     pub fn debug(&self, message: &str) {
         if self.log_level >= LogLevel::Debug {
             self.print_formatted(
-                &format!("{}:", ansi_term::Colour::Cyan.paint("DEBUG")),
+                &format!("{} :", ansi_term::Color::Cyan.paint("DEBUG")),
                 message,
             );
         }
@@ -140,19 +152,34 @@ impl Printer {
     #[allow(unused)]
     pub fn trace(&self, message: &str) {
         if self.log_level >= LogLevel::Trace {
-            self.print_formatted("TRACE:", message);
+            self.print_formatted("TRACE :", message);
         }
     }
 
     #[allow(unused)]
     pub fn print(&self, message: &str) {
-        self.print_formatted("     :", message);
+        self.print_formatted("      :", message);
+    }
+
+    #[allow(unused)]
+    pub fn print_stdout(&self, message: &str) {
+        self.print_formatted(
+            "stdout:",
+            &format!("{}", ansi_term::Color::Green.paint(message)),
+        );
+    }
+
+    #[allow(unused)]
+    pub fn print_stderr(&self, message: &str) {
+        self.print_formatted(
+            "stderr:",
+            &format!("{}", ansi_term::Color::Red.paint(message)),
+        );
     }
 }
 
 impl Drop for Printer {
     fn drop(&mut self) {
         self.clear_line();
-        writeln!(self.lock.borrow_mut(), "     : Done").unwrap();
     }
 }

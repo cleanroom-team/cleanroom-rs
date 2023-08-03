@@ -1,0 +1,21 @@
+[package]
+name = "cli"
+version = "0.1.0"
+edition = "2021"
+
+[[bin]]
+name = "cleanroom"
+path = "src/main.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ansi-escapes = "0.1"
+ansi_term = "0.12"
+anyhow = "1.0"
+clap = { version = "4.3", features = ["derive"] }
+chrono = "0.4"
+mktemp = "0.5"
+tokio = { version = "1.29", default-features = false, features = [ "io-util", "macros", "process", "rt-multi-thread", "sync" ]}
+
+contained_command = { path = "../contained_command" }

@@ -1,0 +1,27 @@
+{
+  "version": "0.2",
+  "language": "en",
+  "languageSettings": [
+    {
+      "languageId": "rust",
+      "words": ["canonicalize", "chrono", "mktemp", "thiserror"],
+      "ignoreRegExpList": [
+        "/#\\[cfg\\b.+\\]/",
+        "/#\\[repr\\b.+\\]/",
+        "/(\\b|::)[a-z0-9_]+::/",
+        "/::[a-z0-9_]+(\\b|::)/"
+      ]
+    },
+    {
+      "languageId": "toml",
+      "words": ["chrono", "mktemp", "thiserror"]
+    },
+    {
+      "languageId": "markdown",
+      "words": [],
+      "ignoreRegExpList": ["`[^`]+`"]
+    }
+  ],
+  "words": ["cleanroom", "nspawn", "setenv", "tmpfs"],
+  "ignorePaths": ["cspell.json", ".github/workflows/*.yaml"]
+}
