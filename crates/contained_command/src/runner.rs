@@ -390,8 +390,8 @@ impl<RT: Clone + std::fmt::Debug + Runtime> Runner<RT> {
     ) -> crate::Result<()> {
         let (mut child, executable, args) = self.run_raw(command)?;
         trace(&format!(
-            "Running {executable:?} {:?} ...",
-            args.join(&OsString::from(" "))
+            "Running {executable:?} {} ...",
+            args.join(&OsString::from(" ")).to_string_lossy()
         ));
 
         let stdin = child.stdin.take().unwrap();
@@ -412,19 +412,19 @@ impl<RT: Clone + std::fmt::Debug + Runtime> Runner<RT> {
                     match result {
                         Ok(exit_status) => {
                             match exit_status.code() {
-                                Some(exit_code) if exit_code ==command. expected_exit_code => {
+                                Some(exit_code) if exit_code == command. expected_exit_code => {
                                     trace(&format!("Child process finished with expected exit code {}", exit_code));
                                     return Ok(());
                                 },
                                 Some(exit_code) => {
-                                    let message = format!("Command finished with unexpected exit code {}", exit_code);
+                                    let message = "Command finished with unexpected exit code".to_string();
                                     error(&message);
-                                    return Err(crate::Error::CommandFailed { command: command.command.clone(), args, message, status: Some(exit_code) });
+                                    return Err(crate::Error::CommandFailed { command: executable.clone(), args, message, status: Some(exit_code) });
                                 },
                                 None => {
                                     let message = format!("Command was interrupted by signal {}", exit_status.signal().unwrap());
                                     error(&message);
-                                    return Err(crate::Error::CommandFailed { command: command.command.clone(), args, message, status: None });
+                                    return Err(crate::Error::CommandFailed { command: executable.clone(), args, message, status: None });
                                 },
                             }
                         },

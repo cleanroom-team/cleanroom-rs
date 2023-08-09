@@ -27,7 +27,7 @@ use std::{
 /// The `Error` enum for this crate
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("{command:?} {:?} failed with exit status {status:?}: {message}", args.join(&OsString::from(" ")))]
+    #[error("{command:?} {} failed with exit status {status:?}: {message}", args.join(&OsString::from(" ")).to_string_lossy())]
     /// A command was not executable
     CommandFailed {
         /// The command that failed

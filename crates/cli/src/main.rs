@@ -58,10 +58,11 @@ async fn main() -> anyhow::Result<()> {
 
     let runner = Nspawn::default_runner(&root_directory)?
         .machine_id(DEFAULT_MACHINE_ID)
+        .share_users()
         .binding(Binding::ro(&exe_path, &PathBuf::from("/agent")));
 
     let mut command = contained_command::Command::new("/agent");
-    command.arg("--agent");
+    command.arg("--agent-mode");
 
     runner
         .run(
