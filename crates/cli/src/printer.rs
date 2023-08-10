@@ -19,6 +19,8 @@ pub enum LogLevel {
 pub struct Printer {
     log_level: LogLevel,
     headlines: RefCell<Vec<String>>,
+    exit_on_error: bool,
+    error_count: RefCell<i32>,
     lock: RefCell<std::io::StdoutLock<'static>>,
 }
 
@@ -31,14 +33,24 @@ impl Debug for Printer {
 }
 
 impl Printer {
-    pub fn new(log_level: &LogLevel) -> Self {
+    pub fn new(log_level: &LogLevel, exit_on_error: bool) -> Self {
         let result = Self {
             log_level: log_level.clone(),
             headlines: RefCell::new(Default::default()),
             lock: RefCell::new(std::io::stdout().lock()),
+            exit_on_error,
+            error_count: RefCell::new(0),
         };
-        result.print_status();
+
+        if result.log_level != LogLevel::Off {
+            result.print_status();
+        }
+
         result
+    }
+
+    pub fn error_count(&self) -> i32 {
+        *self.error_count.borrow()
     }
 
     fn print_status(&self) {
@@ -56,10 +68,16 @@ impl Printer {
     }
 
     fn clear_line(&self) {
-        write!(self.lock.borrow_mut(), "{}\r", ansi_escapes::EraseLine).unwrap();
+        if self.log_level != LogLevel::Off {
+            write!(self.lock.borrow_mut(), "{}\r", ansi_escapes::EraseLine).unwrap();
+        }
     }
 
     fn print_formatted(&self, prefix: &str, message: &str) {
+        if self.log_level == LogLevel::Off {
+            return;
+        }
+
         self.clear_line();
         writeln!(self.lock.borrow_mut(), "{prefix} {message}").unwrap();
 
@@ -116,6 +134,11 @@ impl Printer {
                 &format!(" {}:", ansi_term::Color::Red.paint("ERROR")),
                 message,
             );
+        }
+
+        let old_count = self.error_count.replace_with(|&mut v| v + 1);
+        if self.exit_on_error || old_count == std::i32::MAX / 2 {
+            std::process::exit(old_count + 1);
         }
     }
 

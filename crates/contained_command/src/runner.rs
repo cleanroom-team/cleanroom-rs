@@ -119,7 +119,13 @@ impl Nspawn {
         container_data
             .environment
             .iter()
-            .chain(command.environment.iter())
+            .map(|(k, v)| (k.clone(), v.clone()))
+            .chain(
+                command
+                    .environment
+                    .iter()
+                    .map(|(k, v)| (k.clone(), v.clone())),
+            )
             .map(|(k, v)| {
                 let mut result = OsString::from("--setenv=");
                 result.push(k);
@@ -385,8 +391,8 @@ impl<RT: Clone + std::fmt::Debug + Runtime> Runner<RT> {
         command: &crate::Command,
         trace: &dyn Fn(&str),
         error: &dyn Fn(&str),
-        stdout: &dyn Fn(&str),
-        stderr: &dyn Fn(&str),
+        stdout: &mut dyn FnMut(&'_ str),
+        stderr: &mut dyn FnMut(&'_ str),
     ) -> crate::Result<()> {
         let (mut child, executable, args) = self.run_raw(command)?;
         trace(&format!(
