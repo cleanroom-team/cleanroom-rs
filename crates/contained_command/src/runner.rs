@@ -49,7 +49,7 @@ impl Nspawn {
         sudo_binary: Option<PathBuf>,
         root_directory: &Path,
     ) -> crate::Result<Runner<Nspawn>> {
-        let root_directory = util::resolve_directory(root_directory.as_os_str())?;
+        let root_directory = util::resolve_directory(root_directory)?;
         let root_directory = root_directory.canonicalize()?;
         Ok(Runner::new(Nspawn {
             sudo_binary,

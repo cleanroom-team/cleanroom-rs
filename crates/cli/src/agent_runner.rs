@@ -1,12 +1,12 @@
 // Copyright © Tobias Hunger <tobias.hunger@gmail.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::printer::Printer;
+use crate::{context::SystemContext, printer::Printer};
 
 use anyhow::Context;
 use contained_command::{Binding, Command, Nspawn};
 
-use std::path::{Path, PathBuf};
+use std::{os::unix::prelude::OsStrExt, path::PathBuf};
 
 // - Constants:
 // ----------------------------------------------------------------------
@@ -16,12 +16,7 @@ const DEFAULT_MACHINE_ID: [u8; 32] = [
     b'9', b'7', b'e', b'1', b'd', b'f', b'5', b'e', b'b', b'3', b'b', b'2', b'6', b'4', b'2', b'2',
 ];
 
-fn parse_stdout(
-    m: &str,
-    command_prefix: &str,
-    printer: &Printer,
-    ctx: &mut crate::context::Context,
-) -> bool {
+fn parse_stdout(m: &str, command_prefix: &str, printer: &Printer, ctx: &mut SystemContext) -> bool {
     let Some(cmd) = m.strip_prefix(command_prefix) else {
         return false;
     };
@@ -49,25 +44,48 @@ fn parse_stdout(
 
 #[allow(clippy::needless_pass_by_ref_mut)] // FIXME: It's not useless: It's passed on to parse_stdout!
 pub async fn run_agent(
+    phase: &crate::Phases,
     printer: &Printer,
-    root_directory: &Path,
-    agent_executable: &Path,
-    ctx: &mut crate::context::Context,
+    ctx: &mut SystemContext,
 ) -> anyhow::Result<()> {
     printer.h1("Run Agent", true);
 
-    let runner = Nspawn::default_runner(root_directory)?
+    let Some(phase_script) = crate::scripts::create_script(phase, printer, ctx)
+        .context("Failed to create phase script")?
+    else {
+        return Ok(());
+    };
+
+    printer.h2("Run in container", true);
+    let runner = Nspawn::default_runner(&ctx.root_directory().unwrap())?
         .machine_id(DEFAULT_MACHINE_ID)
-        .share_users()
-        .binding(Binding::ro(&agent_executable, &PathBuf::from("/agent")));
+        .binding(Binding::ro(
+            &phase_script,
+            &PathBuf::from("/clrm/script.sh"),
+        ))
+        .binding(Binding::ro(
+            &ctx.my_binary().unwrap(),
+            &PathBuf::from("/clrm/agent"),
+        ))
+        .binding(Binding::ro(
+            &ctx.busybox_binary().unwrap(),
+            &PathBuf::from("/clrm/busybox"),
+        ))
+        .binding(Binding::ro(
+            &phase_script,
+            &PathBuf::from("/clrm/script.sh"),
+        ));
 
     let command_prefix = uuid::Uuid::new_v4().to_string();
     let command = {
-        let mut command = Command::new("/agent");
+        let mut command = Command::new("/clrm/agent");
         command.arg("agent");
         command.arg(&format!("--command-prefix={command_prefix}"));
 
-        command.envs(ctx.iter());
+        command.envs(
+            ctx.iter()
+                .filter(|(k, _)| k.len() >= 1 && k.as_bytes()[0] != b'_'),
+        );
         command
     };
 
@@ -103,7 +121,8 @@ mod tests {
     ) -> crate::context::Context {
         let printer = Printer::new(&LogLevel::Off, false);
 
-        let mut ctx = crate::context::Context::default();
+        let mut ctx = crate::context::SystemContext::test_context();
+
         ctx.set("FOO", "bar").unwrap();
         ctx.set("BAR", "foo").unwrap();
 

@@ -21,7 +21,12 @@ pub fn is_executable_file(path: &Path) -> bool {
 
 fn home_directory() -> crate::Result<PathBuf> {
     let value = std::env::var_os("HOME").ok_or(crate::Error::InvalidEnv(OsString::from("HOME")))?;
-    Ok(PathBuf::from(value))
+    let path = PathBuf::from(value);
+    path.canonicalize()
+        .map_err(|_| crate::Error::InvalidDirectory {
+            reason: "Could not resolve HOME directory".to_string(),
+            directory: path.as_os_str().to_os_string(),
+        })
 }
 
 pub fn require_binary(binary_name: &str) -> crate::Result<PathBuf> {
@@ -37,7 +42,13 @@ pub fn find_in_path(binary_name: &str) -> crate::Result<Option<PathBuf>> {
     let path = std::env::var_os("PATH").unwrap_or_default();
     let home_dir = home_directory()?;
     for p in PathIterator::new(&path) {
-        let p = resolve_directory_impl(p, &home_dir, None)?;
+        let p = resolve_directory_impl(&PathBuf::from(p), &home_dir, None)?;
+        let p = p
+            .canonicalize()
+            .map_err(|_| crate::Error::InvalidDirectory {
+                reason: "Failed to canonicalize directory".to_string(),
+                directory: p.as_os_str().to_os_string(),
+            })?;
 
         // Just skip over non-existing directories.
         if !p.exists() {
@@ -99,20 +110,23 @@ fn extend_dir(dir: &Path, base_dir: &Path, skip: usize) -> PathBuf {
     result
 }
 
-pub fn resolve_directory(dir: &OsStr) -> crate::Result<PathBuf> {
+pub fn resolve_directory(dir: &Path) -> crate::Result<PathBuf> {
     let home_dir = home_directory()?;
-    let current_dir =
-        std::env::current_dir().map_err(|_| crate::Error::InvalidEnv(OsString::from("CWD")))?;
+    let current_dir = std::env::current_dir().ok();
 
-    resolve_directory_impl(dir, &home_dir, Some(&current_dir))
+    resolve_directory_impl(dir, &home_dir, current_dir)?
+        .canonicalize()
+        .map_err(|_| crate::Error::InvalidDirectory {
+            reason: "Failed to resolve directory".to_string(),
+            directory: dir.as_os_str().to_os_string(),
+        })
 }
 
 fn resolve_directory_impl(
-    dir: &OsStr,
+    dir: &Path,
     home_dir: &Path,
-    current_dir: Option<&Path>,
+    current_dir: Option<PathBuf>,
 ) -> crate::Result<PathBuf> {
-    let dir = Path::new(dir);
     if dir.starts_with("~") {
         if dir.as_os_str().len() == 1 {
             return Ok(home_dir.to_path_buf());
@@ -130,9 +144,9 @@ fn resolve_directory_impl(
     }
     if let Some(current_dir) = current_dir {
         if dir.starts_with("./") {
-            return Ok(extend_dir(dir, current_dir, 1));
+            return Ok(extend_dir(dir, &current_dir, 1));
         } else if dir.starts_with("../") {
-            return Ok(extend_dir(dir, current_dir, 0));
+            return Ok(extend_dir(dir, &current_dir, 0));
         }
     }
     return Err(crate::Error::InvalidDirectory {
@@ -149,7 +163,7 @@ mod tests {
     fn test_resolve_path_abs_path() {
         assert_eq!(
             resolve_directory_impl(
-                &OsString::from("/usr/bin"),
+                &PathBuf::from("/usr/bin"),
                 &PathBuf::from("/home/foo"),
                 None
             )
@@ -161,8 +175,7 @@ mod tests {
     #[test]
     fn test_resolve_path_is_home() {
         assert_eq!(
-            resolve_directory_impl(&OsString::from("~"), &PathBuf::from("/home/foo"), None)
-                .unwrap(),
+            resolve_directory_impl(&PathBuf::from("~"), &PathBuf::from("/home/foo"), None).unwrap(),
             PathBuf::from("/home/foo")
         );
     }
@@ -171,7 +184,7 @@ mod tests {
     fn test_resolve_path_in_home() {
         assert_eq!(
             resolve_directory_impl(
-                &OsString::from("~/.local/bin"),
+                &PathBuf::from("~/.local/bin"),
                 &PathBuf::from("/home/foo"),
                 None
             )
@@ -183,7 +196,7 @@ mod tests {
     #[test]
     fn test_resolve_path_is_other_home() {
         assert!(
-            resolve_directory_impl(&OsString::from("~foo"), &PathBuf::from("/home/foo"), None)
+            resolve_directory_impl(&PathBuf::from("~foo"), &PathBuf::from("/home/foo"), None)
                 .is_err()
         );
     }
@@ -191,7 +204,7 @@ mod tests {
     #[test]
     fn test_resolve_path_in_other_home() {
         assert!(resolve_directory_impl(
-            &OsString::from("~foo/.local/bin"),
+            &PathBuf::from("~foo/.local/bin"),
             &PathBuf::from("/home/foo"),
             None
         )
@@ -201,7 +214,7 @@ mod tests {
     #[test]
     fn test_resolve_path_invalid_dot_path() {
         assert!(resolve_directory_impl(
-            &OsString::from(".local/bin"),
+            &PathBuf::from(".local/bin"),
             &PathBuf::from("/home/foo"),
             None
         )
@@ -211,7 +224,7 @@ mod tests {
     #[test]
     fn test_resolve_path_rel_path() {
         assert!(resolve_directory_impl(
-            &OsString::from("./local/bin"),
+            &PathBuf::from("./local/bin"),
             &PathBuf::from("/home/foo"),
             None
         )
@@ -221,7 +234,7 @@ mod tests {
     #[test]
     fn test_resolve_path_rel_path_up() {
         assert!(resolve_directory_impl(
-            &OsString::from("../local/bin"),
+            &PathBuf::from("../local/bin"),
             &PathBuf::from("/home/foo"),
             None
         )
@@ -232,9 +245,9 @@ mod tests {
     fn test_resolve_path_rel_path_with_current() {
         assert_eq!(
             resolve_directory_impl(
-                &OsString::from("./local/bin"),
+                &PathBuf::from("./local/bin"),
                 &PathBuf::from("/home/foo"),
-                Some(&PathBuf::from("/zzz")),
+                Some(PathBuf::from("/zzz")),
             )
             .unwrap(),
             PathBuf::from("/zzz/local/bin")
@@ -245,9 +258,9 @@ mod tests {
     fn test_resolve_path_rel_path_up_with_current() {
         assert_eq!(
             resolve_directory_impl(
-                &OsString::from("../local/bin"),
+                &PathBuf::from("../local/bin"),
                 &PathBuf::from("/home/foo"),
-                Some(&PathBuf::from("/zzz")),
+                Some(PathBuf::from("/zzz")),
             )
             .unwrap(),
             PathBuf::from("/zzz/../local/bin")

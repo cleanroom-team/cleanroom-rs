@@ -22,6 +22,6 @@
       "ignoreRegExpList": ["`[^`]+`"]
     }
   ],
-  "words": ["cleanroom", "nspawn", "setenv", "tmpfs"],
+  "words": ["cleanroom", "clrm", "nspawn", "setenv", "tmpfs"],
   "ignorePaths": ["cspell.json", ".github/workflows/*.yaml"]
 }

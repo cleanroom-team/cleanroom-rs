@@ -3,38 +3,21 @@
 
 // cSpell: ignore logname
 
-use std::{ffi::OsStr, os::unix::prelude::OsStrExt};
-
-fn blacklisted_var(name: &OsStr) -> bool {
-    let k = name.as_bytes();
-    k == b"PATH"
-        || (k.len() >= 9 && k[0..9] == b"container"[..])
-        || k == b"HOME"
-        || k == b"USER"
-        || k == b"LOGNAME"
-        || k == b"NOTIFY_SOCKET"
-        || k == b"LANG"
-}
+use anyhow::Context;
 
 pub fn run(command_prefix: &str) -> anyhow::Result<()> {
-    let original_env = std::env::vars_os()
-        .filter(|(k, _)| !blacklisted_var(k.as_os_str()))
-        .collect::<std::collections::HashMap<_, _>>();
+    let mut child = std::process::Command::new("/clrm/busybox")
+        .arg("sh")
+        .arg("-e")
+        .arg("/clrm/script.sh")
+        .arg(command_prefix)
+        .spawn()
+        .context("Failed to start phase script")?;
 
-    // Update environment here...
-    std::env::set_var("FOOBAR_zzz", "baz");
-    std::env::set_var("FOOBAR", "baz");
-    std::env::set_var("FOOBAR", "bar");
-    std::env::set_var("TIMESTAMP", "42");
-
-    std::env::vars_os()
-        .filter(|(k, v)| !blacklisted_var(k.as_os_str()) && original_env.get(k) != Some(v))
-        .for_each(|(k, v)| {
-            println!("{command_prefix}: SET {k:?}={v:?}");
-        });
-
-    println!("{command_prefix}: BAR something");
-    println!("{command_prefix}: SET something");
-
-    Ok(())
+    let exit_status = child.wait().context("Failed running the phase script")?;
+    if exit_status.success() {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("Phase script quit with error"))
+    }
 }

@@ -16,12 +16,24 @@ struct Arguments {
     log_level: cli::printer::LogLevel,
 
     /// The directory to create temporary files in
-    #[arg(long = "work-directory", short, default_value = "./work")]
+    #[arg(long = "work-directory", default_value = "./work")]
     work_directory: PathBuf,
 
     /// The directory to store the final artifacts into
-    #[arg(long = "artifact-directory", short, default_value = ".")]
+    #[arg(long = "artifact-directory", default_value = ".")]
     artifact_directory: PathBuf,
+
+    /// The directory to store the final artifacts into (defaults to current time if unset)
+    #[arg(long = "timestamp")]
+    timestamp: Option<String>,
+
+    /// The version string to use (defaults to timestamp if unset)
+    #[arg(long = "artifact-version")]
+    artifact_version: Option<String>,
+
+    /// The version string to use (defaults to timestamp if unset)
+    #[arg(long = "busybox-binary", default_value = "/usr/bin/busybox")]
+    busybox_binary: PathBuf,
 
     /// The command to run
     #[command(subcommand)]
@@ -56,23 +68,26 @@ async fn main() -> anyhow::Result<()> {
     printer.trace("Logging is set up and ready.");
     printer.debug(&format!("Command line arguments: {args:?}"));
 
-    let root_directory = args.work_directory.join(uuid::Uuid::new_v4().to_string());
-    std::fs::create_dir(&root_directory)
-        .context("Failed to create root directory in work directory")?;
-    let root_directory = root_directory
-        .canonicalize()
-        .context("Failed to canonicalize {root_directory:?}")?;
-    printer.debug(&format!("ROOT_DIR: {root_directory:?}"));
-
-    let exe_path = std::env::current_exe().context("Failed to find current executable path")?;
-    printer.debug("own path: {exe_path:?}");
+    let myself = std::env::current_exe().context("Failed to find current executable path")?;
 
     printer.h2("system context", true);
+    let base_ctx = cli::context::Context::new(&args.timestamp, &args.artifact_version);
+    let mut ctx = base_ctx
+        .set_system(
+            "test_system",
+            &args.work_directory,
+            &args.artifact_directory,
+            &args.busybox_binary,
+            &myself,
+        )
+        .context("Failed to set up system context")?;
 
-    let mut ctx = cli::context::Context::default();
+    for (k, v) in ctx.iter() {
+        printer.debug(&format!("System context: {k:?} = {v:?}"));
+    }
 
     printer.h1("Run agent", true);
-    cli::agent_runner::run_agent(&printer, &root_directory, &exe_path, &mut ctx)
+    cli::agent_runner::run_agent(&cli::Phases::Test, &printer, &mut ctx)
         .await
         .context("Failed to drive agent")?;
     Ok(())
