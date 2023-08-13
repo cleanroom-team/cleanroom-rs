@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, ffi::OsStr, path::Path, rc::Rc};
 
 use anyhow::{anyhow, Context};
 
-use crate::printer::Printer;
+use crate::{printer::Printer, Phases, SubPhases};
 
 fn validate_command_name(name: &str) -> anyhow::Result<()> {
     if name
@@ -24,10 +24,7 @@ fn validate_command_name(name: &str) -> anyhow::Result<()> {
 }
 
 fn validate_phase_name(phase_name: &str) -> anyhow::Result<()> {
-    if crate::Phases::Invalid.any(|p| {
-        eprintln!("Phase: {}", p.to_string());
-        p.to_string() == phase_name
-    }) {
+    if Phases::iter().any(|p| p.to_string() == phase_name) {
         Ok(())
     } else {
         Err(anyhow!("{phase_name} is not a valid phase name"))
@@ -35,10 +32,7 @@ fn validate_phase_name(phase_name: &str) -> anyhow::Result<()> {
 }
 
 fn validate_sub_phase_name(sub_phase_name: &str) -> anyhow::Result<()> {
-    if crate::SubPhases::Invalid.any(|p| {
-        eprintln!("SubPhase: {}", p.to_string());
-        p.to_string() == sub_phase_name
-    }) {
+    if SubPhases::iter().any(|p| p.to_string() == sub_phase_name) {
         Ok(())
     } else {
         Err(anyhow!("{sub_phase_name} is not a valid sub-phase name"))
@@ -48,7 +42,7 @@ fn validate_sub_phase_name(sub_phase_name: &str) -> anyhow::Result<()> {
 /// Meta-information about an `Input`
 #[derive(Clone, Debug, serde::Deserialize)]
 #[serde(untagged)]
-enum Input {
+pub enum Input {
     Basic(String),
     Full { name: String, help: Option<String> },
 }
@@ -69,57 +63,38 @@ impl Input {
     }
 }
 
-/// Meta-information about a `Command` script snippet
-#[derive(Clone, Debug, serde::Deserialize)]
-#[serde(untagged)]
-enum Phase {
-    /// The snippet
-    Simple(String),
-    Complex(BTreeMap<String, String>),
-}
-
-impl Phase {
-    fn defined_sub_phases(&self) -> impl Iterator<Item = String> + '_ {
-        match self {
-            Phase::Simple(_) => itertools::Either::Left(std::iter::once(String::from("main"))),
-            Phase::Complex(m) => itertools::Either::Right(m.keys().cloned()),
-        }
-    }
-
-    fn sub_phase(&self, sub_phase: crate::SubPhases) -> Option<String> {
-        match self {
-            Phase::Simple(value) => {
-                if sub_phase == crate::SubPhases::Main {
-                    Some(value.clone())
-                } else {
-                    None
-                }
-            }
-            Phase::Complex(m) => m.get(&sub_phase.to_string()).cloned(),
-        }
-    }
-}
-
 /// Meta-information about a `Command`
 #[derive(Clone, Debug, serde::Deserialize)]
-struct Command {
+pub struct Command {
     /// Help about the `Command`
     help: Option<String>,
     /// Can this command get aliased?
     #[serde(default)]
-    can_alias: bool,
+    pub can_alias: bool,
     /// Input to the command
     inputs: Vec<Input>,
 
     /// Script snippets
-    phases: BTreeMap<String, Phase>,
+    #[serde(default)]
+    phases: BTreeMap<String, String>,
 }
 
-/// A `Command` as defined
-#[derive(Debug, serde::Deserialize)]
-struct TomlCommand {
-    /// The `Data`about the `Command`
-    command: Command,
+impl Command {
+    pub fn snippet(&self, phase: &Phases, sub_phase: &SubPhases) -> Option<&String> {
+        let key = {
+            let sp = phase.to_string();
+            if sub_phase == &SubPhases::Main {
+                sp
+            } else {
+                format!("{sp}_{}", sub_phase)
+            }
+        };
+        self.phases.get(&key)
+    }
+
+    pub fn inputs(&self) -> impl Iterator<Item = &Input> {
+        self.inputs.iter()
+    }
 }
 
 impl std::fmt::Display for Command {
@@ -130,7 +105,7 @@ impl std::fmt::Display for Command {
 
         let inputs = &self.inputs;
         if inputs.is_empty() {
-            writeln!(f, "  inputs: <none>\n")?
+            writeln!(f, "  inputs: <none>")?
         } else {
             writeln!(f, "  inputs:")?;
             for i in inputs {
@@ -142,8 +117,24 @@ impl std::fmt::Display for Command {
                 writeln!(f, "    {}{}", i.name(), help)?
             }
         }
+        if self.phases.is_empty() {
+            writeln!(f, "  phases: <none>")?;
+        } else {
+            writeln!(f, "  phases:")?;
+            for p in self.phases.keys() {
+                writeln!(f, "    {p}")?;
+            }
+        }
         writeln!(f)
     }
+}
+
+/// The toml file structure holding a `Command` as defined
+#[derive(Debug, serde::Deserialize)]
+struct TomlCommand {
+    /// The `Data`about the `Command`
+    command: Command,
+    phases: BTreeMap<String, String>,
 }
 
 impl TomlCommand {
@@ -151,8 +142,11 @@ impl TomlCommand {
         let contents = std::fs::read_to_string(command)
             .context(format!("Failed to read command definition in {command:?}"))?;
 
-        let header = toml::from_str::<TomlCommand>(&contents)
+        let mut header = toml::from_str::<TomlCommand>(&contents)
             .context(format!("Failed to parse command from {command:?}"))?;
+
+        header.command.phases = header.phases;
+
         Ok(header.command)
     }
 }
@@ -184,14 +178,22 @@ impl CommandManagerBuilder {
             if p.is_file() && p.extension() == Some(OsStr::new("toml")) {
                 let mut cmd = TomlCommand::read_from_file(&p)
                     .context(format!("Failed to read command from {p:?}"))?;
+
                 cmd.can_alias = cmd.can_alias && can_alias; // Force aliasing off
                 let name = p.file_stem().unwrap().to_string_lossy().to_string();
                 validate_command_name(&name)?;
 
-                for (phase_name, phase) in cmd.phases.iter() {
-                    validate_phase_name(phase_name)?;
-                    for sub_phase_name in phase.defined_sub_phases() {
-                        validate_sub_phase_name(&sub_phase_name)?;
+                for phase_name in cmd.phases.keys() {
+                    let (pn, spn) = {
+                        if let Some((pn, spn)) = phase_name.split_once('_') {
+                            (pn, Some(spn))
+                        } else {
+                            (phase_name.as_ref(), None)
+                        }
+                    };
+                    validate_phase_name(pn)?;
+                    if let Some(spn) = spn {
+                        validate_sub_phase_name(spn)?;
                     }
                 }
 
@@ -214,17 +216,9 @@ pub struct CommandManager {
 }
 
 impl CommandManager {
-    pub fn generate_script_snippet_for(
-        &self,
-        name: &str,
-        phase: crate::Phases,
-        sub_phase: crate::SubPhases,
-    ) -> anyhow::Result<Option<String>> {
+    pub fn command(&self, name: &str) -> anyhow::Result<Rc<Command>> {
         if let Some(command) = self.commands.get(name) {
-            let Some(phase) = &command.phases.get(&format!("{}", phase)) else {
-                return Ok(None);
-            };
-            Ok(phase.sub_phase(sub_phase).clone())
+            Ok(command.clone())
         } else {
             Err(anyhow::anyhow!("Command {name:?} not found"))
         }

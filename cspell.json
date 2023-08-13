@@ -14,7 +14,7 @@
     },
     {
       "languageId": "toml",
-      "words": ["chrono", "itertools", "mktemp", "serde", "thiserror"]
+      "words": ["chrono", "mktemp", "serde", "thiserror"]
     },
     {
       "languageId": "markdown",

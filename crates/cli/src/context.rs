@@ -341,12 +341,12 @@ impl std::fmt::Display for SystemContext {
         if self.variables.is_empty() {
             writeln!(f, "  variables = {{}},")?;
         } else {
-            writeln!(f, "  variables = {{{}}},", self.variables)?;
+            writeln!(f, "  variables = {{\n{}  }},", self.variables)?;
         }
         if self.commands.is_empty() {
             writeln!(f, "  commands = {{}},")?;
         } else {
-            writeln!(f, "  commands = {{{}}},", self.commands)?;
+            writeln!(f, "  commands = {{\n{}  }},", self.commands)?;
         }
         writeln!(f, "}}")
     }

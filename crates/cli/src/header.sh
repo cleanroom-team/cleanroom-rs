@@ -1,4 +1,4 @@
-### <header.sh>
+#!/usr/bin/sh -e
 
 # The entire script is run in `busybox sh -e`
 
@@ -10,5 +10,3 @@ export_var() {
 
 	echo "${command_prefix}: SET \"${key}\"=\"${value}\""
 }
-
-### </header.sh>

@@ -3,7 +3,6 @@
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum Phases {
-    Invalid,
     Prepare,
     Install,
     Polish,
@@ -14,35 +13,41 @@ pub enum Phases {
 
 impl std::fmt::Display for Phases {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Phases::Invalid => write!(f, "<invalid>"),
-            _ => {
-                let debug = format!("{:?}", self).to_lowercase();
-                write!(f, "{debug}")
-            }
-        }
+        let debug = format!("{:?}", self).to_lowercase();
+        write!(f, "{debug}")
     }
 }
 
-impl Iterator for Phases {
+impl Phases {
+    fn iter() -> PhasesIter {
+        PhasesIter(None)
+    }
+}
+
+pub struct PhasesIter(Option<Phases>);
+
+impl Iterator for PhasesIter {
     type Item = Phases;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            Phases::Invalid => Some(Phases::Prepare),
-            Phases::Prepare => Some(Phases::Install),
-            Phases::Install => Some(Phases::Polish),
-            Phases::Polish => Some(Phases::Test),
-            Phases::Test => Some(Phases::GenerateArtifacts),
-            Phases::GenerateArtifacts => Some(Phases::TestArtifacts),
-            Phases::TestArtifacts => None,
+        let next = match self.0 {
+            None => Some(Phases::Prepare),
+            Some(Phases::Prepare) => Some(Phases::Install),
+            Some(Phases::Install) => Some(Phases::Polish),
+            Some(Phases::Polish) => Some(Phases::Test),
+            Some(Phases::Test) => Some(Phases::GenerateArtifacts),
+            Some(Phases::GenerateArtifacts) => Some(Phases::TestArtifacts),
+            Some(Phases::TestArtifacts) => None,
+        };
+        if next.is_some() {
+            self.0 = next.clone();
         }
+        next
     }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum SubPhases {
-    Invalid,
     Pre,
     Main,
     Post,
@@ -51,7 +56,6 @@ pub enum SubPhases {
 impl std::fmt::Display for SubPhases {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            SubPhases::Invalid => write!(f, "<invalid>"),
             SubPhases::Pre => write!(f, "pre"),
             SubPhases::Main => write!(f, "main"),
             SubPhases::Post => write!(f, "post"),
@@ -59,16 +63,28 @@ impl std::fmt::Display for SubPhases {
     }
 }
 
-impl Iterator for SubPhases {
+impl SubPhases {
+    pub fn iter() -> SubPhasesIter {
+        SubPhasesIter(None)
+    }
+}
+
+pub struct SubPhasesIter(Option<SubPhases>);
+
+impl Iterator for SubPhasesIter {
     type Item = SubPhases;
 
     fn next(&mut self) -> Option<Self::Item> {
-        match self {
-            SubPhases::Invalid => Some(SubPhases::Pre),
-            SubPhases::Pre => Some(SubPhases::Main),
-            SubPhases::Main => Some(SubPhases::Post),
-            SubPhases::Post => None,
+        let next = match self.0 {
+            None => Some(SubPhases::Pre),
+            Some(SubPhases::Pre) => Some(SubPhases::Main),
+            Some(SubPhases::Main) => Some(SubPhases::Post),
+            Some(SubPhases::Post) => None,
+        };
+        if next.is_some() {
+            self.0 = next.clone();
         }
+        next
     }
 }
 
@@ -78,3 +94,34 @@ pub mod commands;
 pub mod context;
 pub mod printer;
 pub mod scripts;
+
+#[cfg(test)]
+mod tests {
+    use std::collections::HashSet;
+
+    use super::*;
+
+    #[test]
+    fn test_phase_names() {
+        let mut known_names = HashSet::new();
+        for p in Phases::iter() {
+            let pn = p.to_string();
+
+            assert!(known_names.insert(pn.clone()));
+            assert!(pn.chars().all(|c| c.is_ascii_lowercase()));
+        }
+        assert_eq!(known_names.len(), 6);
+    }
+
+    #[test]
+    fn test_sub_phase_names() {
+        let mut known_names = HashSet::new();
+        for sp in SubPhases::iter() {
+            let spn = sp.to_string();
+
+            assert!(known_names.insert(spn.clone()));
+            assert!(spn.chars().all(|c| c.is_ascii_lowercase()))
+        }
+        assert_eq!(known_names.len(), 3);
+    }
+}
