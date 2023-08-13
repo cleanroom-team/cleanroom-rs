@@ -71,7 +71,26 @@ async fn main() -> anyhow::Result<()> {
     let myself = std::env::current_exe().context("Failed to find current executable path")?;
 
     printer.h2("system context", true);
-    let base_ctx = cli::context::Context::new(&args.timestamp, &args.artifact_version);
+    let mut base_ctx = {
+        let mut builder = cli::context::ContextBuilder::new(printer);
+        if let Some(ts) = &args.timestamp {
+            builder = builder.timestamp(ts.clone())?;
+        }
+        if let Some(v) = &args.artifact_version {
+            builder = builder.version(v.clone())?;
+        }
+
+        builder.build()
+    };
+
+    let printer = base_ctx.printer();
+
+    base_ctx.command_manager_builder().scan_for_commands(
+        &PathBuf::from("./commands"),
+        false,
+        &printer,
+    )?;
+
     let mut ctx = base_ctx
         .set_system(
             "test_system",
@@ -82,12 +101,10 @@ async fn main() -> anyhow::Result<()> {
         )
         .context("Failed to set up system context")?;
 
-    for (k, v) in ctx.iter() {
-        printer.debug(&format!("System context: {k:?} = {v:?}"));
-    }
+    printer.debug(&format!("{ctx}"));
 
     printer.h1("Run agent", true);
-    cli::agent_runner::run_agent(&cli::Phases::Test, &printer, &mut ctx)
+    cli::agent_runner::run_agent(&cli::Phases::Test, &mut ctx)
         .await
         .context("Failed to drive agent")?;
     Ok(())

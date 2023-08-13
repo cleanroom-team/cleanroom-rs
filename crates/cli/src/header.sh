@@ -5,12 +5,10 @@
 command_prefix="${1}"
 
 export_var() {
-  key="${1}";
-  value="${2}"
+	key="${1}"
+	value="${2}"
 
-  echo "${command_prefix}: SET \"${key}\"=\"${value}\""
+	echo "${command_prefix}: SET \"${key}\"=\"${value}\""
 }
-
-env
 
 ### </header.sh>

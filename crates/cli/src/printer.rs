@@ -79,7 +79,9 @@ impl Printer {
         }
 
         self.clear_line();
-        writeln!(self.lock.borrow_mut(), "{prefix} {message}").unwrap();
+        for l in message.split('\n') {
+            writeln!(self.lock.borrow_mut(), "{prefix} {l}").unwrap();
+        }
 
         self.print_status();
     }
