@@ -51,6 +51,10 @@ fn parse_stdout(m: &str, command_prefix: &str, ctx: &mut SystemContext) -> bool 
                 "Could not parse arguments after SET: No '=' found in {to_set:?}"
             ));
         }
+    } else if let Some(status) = cmd.strip_prefix("STATUS ") {
+        let status = status.trim();
+        let status = status.trim_matches('"');
+        ctx.printer().h3(status, false);
     } else {
         p.error(&format!("Agent asked to process unknown command {cmd:?}"))
     }
