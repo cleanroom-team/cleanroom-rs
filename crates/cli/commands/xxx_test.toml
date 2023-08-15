@@ -1,7 +1,5 @@
 [command]
-
 script = """
-    if [ "${CURRENT_PHASE}" = "test" ]; then
-        echo "Running my test binary!";
-    fi
+    distribution arch
+    debug_mode
 """

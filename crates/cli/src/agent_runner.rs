@@ -37,10 +37,8 @@ fn parse_stdout(m: &str, command_prefix: &str, ctx: &mut RunContext) -> bool {
         }
     } else if let Some(to_set) = cmd.strip_prefix("SET_RO ") {
         if let Some((k, v)) = to_set.split_once('=') {
-            println!("Setting >{k}< to >{v}<");
             let k = k.trim().trim_matches('"');
             let v = v.trim().trim_matches('"');
-            println!("Setting (trimmed) >{k}< to >{v}<");
             if let Err(e) = ctx.set(k, v, true, false) {
                 p.error(&format!("Could not parse arguments after SET_RO {k}: {e}"));
             }

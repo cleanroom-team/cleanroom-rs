@@ -1,9 +1,15 @@
 [command]
-
 inputs = [{ name = "distribution_id", help = "The base distribution id" }]
+help = """
+Set the base distribution to use for cleanroom.
+\t\t\t\tPossible values are \"arch\".
+"""
 
 script = """
-    if [ "${CURRENT_PHASE}" = "prepare" ]; then
+    if [ "${CURRENT_PHASE}" = "${PHASE_PREPARE}" ]; then
+        export_var PACKAGES ""
+        export_var KERNEL_CMDLINE ""
+
         export_constant OS_RELEASE_NAME "cleanroom"
         export_constant OS_RELEASE_PRETTY_NAME "cleanroom Linux"
         export_constant OS_RELEASE_ID "clrm"
@@ -13,5 +19,7 @@ script = """
         else
            error "Unknown base distribution id ${distribution_id} provided"
         fi
+
+        export_constant CLRM_BASE_DISTRIBUTION "${distribution_id}"
     fi
 """
