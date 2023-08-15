@@ -1,0 +1,17 @@
+[command]
+
+inputs = [{ name = "distribution_id", help = "The base distribution id" }]
+
+script = """
+    if [ "${CURRENT_PHASE}" = "prepare" ]; then
+        export_constant OS_RELEASE_NAME "cleanroom"
+        export_constant OS_RELEASE_PRETTY_NAME "cleanroom Linux"
+        export_constant OS_RELEASE_ID "clrm"
+
+        if [ "${distribution_id}" == "arch" ]; then
+            _distribution_arch
+        else
+           error "Unknown base distribution id ${distribution_id} provided"
+        fi
+    fi
+"""

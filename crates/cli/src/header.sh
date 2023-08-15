@@ -34,3 +34,17 @@ export_var() {
 
 	echo "${__command_prefix}: SET \"${key}\"=\"${value}\""
 }
+
+alias_command() {
+	key="${1}"
+	shift
+	value="${1}"
+	shift
+
+	echo "${__command_prefix}: ALIAS \"${key}\"=\"${value}\""
+}
+
+error() {
+	echo "Error: ${*}"
+	exit 1
+}

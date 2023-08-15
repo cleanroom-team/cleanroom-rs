@@ -1,0 +1,9 @@
+[command]
+
+script = """
+    if [ "${CURRENT_PHASE}" = "prepare" ]; then
+        export_constant OS_RELEASE_ID_LIKE "arch"
+        export_constant OS_RELEASE_IMAGE_ID "${TIMESTAMP}"
+        export_constant OS_RELEASE_IMAGE_VERSION "${VERSION}"
+    fi
+"""

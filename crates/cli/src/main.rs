@@ -85,11 +85,9 @@ fn create_system_context(
 
     let printer = base_ctx.printer();
 
-    base_ctx.command_manager_builder().scan_for_commands(
-        &PathBuf::from("./commands"),
-        false,
-        &printer,
-    )?;
+    base_ctx
+        .command_manager_builder()
+        .scan_for_commands(&PathBuf::from("."), false, &printer)?;
 
     let ctx = base_ctx
         .set_system(
@@ -99,8 +97,6 @@ fn create_system_context(
             &myself,
         )
         .context("Failed to set up system context")?;
-
-    printer.debug(&format!("{ctx}"));
 
     Ok(ctx)
 }

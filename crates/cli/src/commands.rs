@@ -1,11 +1,14 @@
 // Copyright © Tobias Hunger <tobias.hunger@gmail.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use std::{collections::BTreeMap, ffi::OsStr, path::Path, rc::Rc};
+use std::{collections::BTreeMap, ffi::OsStr, path::Path};
 
 use anyhow::{anyhow, Context};
 
 use crate::printer::Printer;
+
+static BUILTIN_COMMANDS_DIR: include_dir::Dir<'_> =
+    include_dir::include_dir!("$CARGO_MANIFEST_DIR/commands");
 
 fn validate_command_name(name: &str) -> anyhow::Result<()> {
     if name
@@ -105,16 +108,39 @@ impl TomlCommand {
         let contents = std::fs::read_to_string(command)
             .context(format!("Failed to read command definition in {command:?}"))?;
 
-        let header = toml::from_str::<TomlCommand>(&contents)
-            .context(format!("Failed to parse command from {command:?}"))?;
+        Self::from_str(&contents).context(format!("Failed to parse {command:?}"))
+    }
+
+    fn from_str(contents: &str) -> anyhow::Result<Command> {
+        let header = toml::from_str::<TomlCommand>(contents)
+            .context("Failed to parse command definition")?;
 
         Ok(header.command)
     }
 }
 
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct CommandManagerBuilder {
-    commands: BTreeMap<String, Rc<Command>>,
+    commands: BTreeMap<String, Command>,
+}
+
+impl Default for CommandManagerBuilder {
+    fn default() -> Self {
+        let mut result = Self {
+            commands: Default::default(),
+        };
+
+        // Add builtin commands:
+        for f in BUILTIN_COMMANDS_DIR.files() {
+            let contents = f.contents_utf8().unwrap();
+            let name = f.path().file_stem().unwrap().to_string_lossy().to_string();
+
+            let cmd = TomlCommand::from_str(contents).unwrap();
+            result.commands.insert(name, cmd);
+        }
+
+        result
+    }
 }
 
 impl CommandManagerBuilder {
@@ -144,7 +170,7 @@ impl CommandManagerBuilder {
                 let name = p.file_stem().unwrap().to_string_lossy().to_string();
                 validate_command_name(&name)?;
 
-                if self.commands.insert(name.clone(), Rc::new(cmd)).is_some() {
+                if self.commands.insert(name.clone(), cmd).is_some() {
                     printer.info(&format!("Re-defined command {}", name));
                 }
             } else {
@@ -159,19 +185,19 @@ impl CommandManagerBuilder {
 
 #[derive(Clone, Debug)]
 pub struct CommandManager {
-    commands: BTreeMap<String, Rc<Command>>,
+    commands: BTreeMap<String, Command>,
 }
 
 impl CommandManager {
-    pub fn command(&self, name: &str) -> anyhow::Result<Rc<Command>> {
+    pub fn command(&self, name: &str) -> anyhow::Result<&Command> {
         if let Some(command) = self.commands.get(name) {
-            Ok(command.clone())
+            Ok(command)
         } else {
             Err(anyhow::anyhow!("Command {name:?} not found"))
         }
     }
 
-    pub fn commands(&self) -> impl Iterator<Item = (&String, &Rc<Command>)> {
+    pub fn commands(&self) -> impl Iterator<Item = (&String, &Command)> {
         self.commands.iter()
     }
 
@@ -180,15 +206,22 @@ impl CommandManager {
     }
 
     pub fn alias(&mut self, from: &str, to: &str) -> anyhow::Result<()> {
-        let Some(from) = self.commands.get(from) else {
+        let Some(from_cmd) = self.commands.get(from) else {
             return Err(anyhow!("Can not find {from} to alias"));
         };
-        if !from.can_alias {
+        if !from_cmd.can_alias {
             return Err(anyhow!("I may not alias {from}. Check the command definition or maybe it was loaded from a user directory?"));
         }
-        validate_command_name(to).context(format!("{to} is not a valid name to alias to"))?;
 
-        self.commands.insert(to.to_string(), from.clone());
+        validate_command_name(to).context(format!("{to} is not a valid name to alias to"))?;
+        let aliased_command = Command {
+            script: format!("{from} \"${{@}}\""),
+            can_alias: false,
+            help: Some(format!("Alias of {from}")),
+            inputs: Vec::new(),
+        };
+
+        self.commands.insert(to.to_string(), aliased_command);
 
         Ok(())
     }

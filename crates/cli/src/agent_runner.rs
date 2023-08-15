@@ -25,12 +25,10 @@ fn parse_stdout(m: &str, command_prefix: &str, ctx: &mut RunContext) -> bool {
     p.trace(&format!("Processing {}", cmd));
     if let Some(to_set) = cmd.strip_prefix("SET ") {
         if let Some((k, v)) = to_set.split_once('=') {
-            let k = k.trim_matches('"');
-            let v = v.trim_matches('"');
-            if ctx.set(k, v, false, false).is_err() {
-                p.error(&format!(
-                    "Could not parse arguments after SET: {k:?} is not a valid variable name"
-                ));
+            let k = k.trim().trim_matches('"');
+            let v = v.trim().trim_matches('"');
+            if let Err(e) = ctx.set(k, v, false, false) {
+                p.error(&format!("Could not parse arguments after SET {k}: {e}"));
             }
         } else {
             p.error(&format!(
@@ -39,12 +37,12 @@ fn parse_stdout(m: &str, command_prefix: &str, ctx: &mut RunContext) -> bool {
         }
     } else if let Some(to_set) = cmd.strip_prefix("SET_RO ") {
         if let Some((k, v)) = to_set.split_once('=') {
-            let k = k.trim_matches('"');
-            let v = v.trim_matches('"');
-            if ctx.set(k, v, true, false).is_err() {
-                p.error(&format!(
-                    "Could not parse arguments after SET_RO: {k:?} is not a valid variable name"
-                ));
+            println!("Setting >{k}< to >{v}<");
+            let k = k.trim().trim_matches('"');
+            let v = v.trim().trim_matches('"');
+            println!("Setting (trimmed) >{k}< to >{v}<");
+            if let Err(e) = ctx.set(k, v, true, false) {
+                p.error(&format!("Could not parse arguments after SET_RO {k}: {e}"));
             }
         } else {
             p.error(&format!(
@@ -52,9 +50,16 @@ fn parse_stdout(m: &str, command_prefix: &str, ctx: &mut RunContext) -> bool {
             ));
         }
     } else if let Some(status) = cmd.strip_prefix("STATUS ") {
-        let status = status.trim();
-        let status = status.trim_matches('"');
+        let status = status.trim().trim_matches('"');
         ctx.printer().h3(status, true);
+    } else if let Some(to_alias) = cmd.strip_prefix("ALIAS ") {
+        if let Some((k, v)) = to_alias.split_once('=') {
+            let k = k.trim().trim_matches('"');
+            let v = v.trim().trim_matches('"');
+            if let Err(e) = ctx.command_manager_mut().alias(k, v) {
+                p.error(&format!("Failed to ALIAS: {e}"));
+            }
+        }
     } else {
         p.error(&format!("Agent asked to process unknown command {cmd:?}"))
     }
@@ -67,6 +72,7 @@ pub async fn run_agent(ctx: &mut RunContext, command: &str) -> anyhow::Result<()
     p.h1("Run Agent", true);
 
     for phase in crate::Phases::iter() {
+        p.debug(&format!("Entering {phase} with {ctx}"));
         let agent_script =
             crate::scripts::create_script(ctx, command).context("Failed to create agent script")?;
 
