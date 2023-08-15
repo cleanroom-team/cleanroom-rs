@@ -7,9 +7,6 @@ shift
 CURRENT_PHASE="${1}"
 readonly CURRENT_PHASE
 shift
-CURRENT_SUB_PHASE="${1}"
-readonly CURRENT_SUB_PHASE
-shift
 
 status() {
 	message="${1}"
@@ -18,7 +15,7 @@ status() {
 	echo "${__command_prefix}: STATUS \"${message}\""
 }
 
-status "Setup: ${CURRENT_PHASE}::${CURRENT_SUB_PHASE}"
+status "Setup: ${CURRENT_PHASE}"
 
 export_constant() {
 	key="${1}"

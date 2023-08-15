@@ -34,10 +34,6 @@ impl Section {
         self.contents.push_str(to_add);
     }
 
-    fn push(&mut self, rhs: char) {
-        self.contents.push(rhs);
-    }
-
     fn extract(self) -> String {
         let mut result = String::new();
         result += &format!("### <{}>\n", self.name);
@@ -80,13 +76,6 @@ fn script_add_phase_definitions() -> Section {
     for p in crate::Phases::iter().map(|p| p.to_string()) {
         let pu = p.to_uppercase();
         section.push_str(&format!("PHASE_{pu}=\"{p}\"\nreadonly PHASE_{pu}\n"));
-    }
-    section.push('\n');
-    for sp in crate::SubPhases::iter().map(|sp| sp.to_string()) {
-        let spu = sp.to_uppercase();
-        section.push_str(&format!(
-            "SUB_PHASE_{spu}=\"{sp}\"; readonly SUB_PHASE_{spu}\n",
-        ));
     }
     section
 }

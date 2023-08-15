@@ -32,32 +32,6 @@ impl std::fmt::Display for Phases {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, clap::ValueEnum)]
-#[clap(rename_all = "snake_case")]
-pub enum SubPhases {
-    Pre,
-    Main,
-    Post,
-}
-
-impl SubPhases {
-    pub fn iter() -> impl Iterator<Item = &'static SubPhases> {
-        SubPhases::value_variants().iter()
-    }
-}
-
-impl std::fmt::Display for SubPhases {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.to_possible_value()
-                .map(|pv| pv.get_name().to_string())
-                .unwrap_or_else(|| "<unknown>".to_string())
-        )
-    }
-}
-
 pub mod agent;
 pub mod agent_runner;
 pub mod commands;
@@ -78,20 +52,8 @@ mod tests {
             let pn = p.to_string();
 
             assert!(known_names.insert(pn.clone()));
-            assert!(pn.chars().all(|c| c.is_ascii_lowercase()));
+            assert!(pn.chars().all(|c| c.is_ascii_lowercase() || c == '_'));
         }
         assert_eq!(known_names.len(), 6);
-    }
-
-    #[test]
-    fn test_sub_phase_names() {
-        let mut known_names = HashSet::new();
-        for sp in SubPhases::iter() {
-            let spn = sp.to_string();
-
-            assert!(known_names.insert(spn.clone()));
-            assert!(spn.chars().all(|c| c.is_ascii_lowercase()))
-        }
-        assert_eq!(known_names.len(), 3);
     }
 }

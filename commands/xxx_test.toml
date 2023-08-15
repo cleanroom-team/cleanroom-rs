@@ -1,7 +1,7 @@
 [command]
 
 script = """
-    if [ "${CURRENT_PHASE}" = "test" -a "${CURRENT_SUB_PHASE}" = "main" ]; then
+    if [ "${CURRENT_PHASE}" = "test" ]; then
         echo "Running my test binary!";
     fi
 """
