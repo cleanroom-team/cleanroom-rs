@@ -6,8 +6,7 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 
-use crate::context::SystemContext;
-use crate::{Phases, SubPhases};
+use crate::context::RunContext;
 
 struct Section {
     name: String,
@@ -32,7 +31,11 @@ impl Section {
         } else {
             rhs
         };
-        self.contents += to_add;
+        self.contents.push_str(to_add);
+    }
+
+    fn push(&mut self, rhs: char) {
+        self.contents.push(rhs);
     }
 
     fn extract(self) -> String {
@@ -72,49 +75,43 @@ fn script_add_header() -> Section {
     section
 }
 
-fn command_function_name(name: &str, sub_phase: &SubPhases) -> String {
-    let name_extra = {
-        if sub_phase == &SubPhases::Main {
-            String::new()
-        } else {
-            format!("_{}", sub_phase)
-        }
-    };
-    format!("cmd_{name}{name_extra}")
+fn script_add_phase_definitions() -> Section {
+    let mut section = Section::new("phase definitions");
+    for p in crate::Phases::iter().map(|p| p.to_string()) {
+        let pu = p.to_uppercase();
+        section.push_str(&format!("PHASE_{pu}=\"{p}\"\nreadonly PHASE_{pu}\n"));
+    }
+    section.push('\n');
+    for sp in crate::SubPhases::iter().map(|sp| sp.to_string()) {
+        let spu = sp.to_uppercase();
+        section.push_str(&format!(
+            "SUB_PHASE_{spu}=\"{sp}\"; readonly SUB_PHASE_{spu}\n",
+        ));
+    }
+    section
 }
 
-fn script_add_command_definitions(
-    name: &str,
-    phase: &Phases,
-    ctx: &SystemContext,
-) -> anyhow::Result<Section> {
+fn script_add_command_definitions(ctx: &RunContext) -> anyhow::Result<Section> {
     let mut section = Section::new("command definition");
 
-    let cmd = ctx.command_manager().command(name)?;
-
-    for sub_phase in SubPhases::iter() {
-        if let Some(script) = cmd.snippet(phase, &sub_phase) {
-            section.push_str(&format!(
-                "{}() {{\n",
-                command_function_name(name, &sub_phase)
-            ));
-            for i in cmd.inputs() {
-                section.push_str(&format!("    {}=\"${{1}}\"; shift\n", i.name()));
-            }
-            section.push_str(&format!("\n{script}\n}}\n\n"));
+    for (name, cmd) in ctx.command_manager().commands() {
+        section.push_str(&format!("{name}() {{\n"));
+        for i in cmd.inputs() {
+            section.push_str(&format!("    {}=\"${{1}}\"; shift\n", i.name()));
         }
+        section.push_str(&format!("\n{}\n}}\n\n", cmd.script));
     }
 
     Ok(section)
 }
 
-fn script_add_system_environment(ctx: &SystemContext) -> Section {
+fn script_add_system_environment(ctx: &RunContext) -> Section {
     let mut section = Section::new("system environment");
     for ce in ctx.iter().filter(|ce| !ce.is_internal) {
         let value = escape(&ce.value);
         if ce.is_read_only {
             section.push_str(&format!(
-                "{}=\"{}\"; readonly {}\n",
+                "{}=\"{}\"\nreadonly {}\n",
                 ce.name, value, ce.name
             ));
         } else {
@@ -124,39 +121,49 @@ fn script_add_system_environment(ctx: &SystemContext) -> Section {
     section
 }
 
+fn script_add_pre_command() -> Section {
+    let mut section = Section::new("pre_command");
+    section.push_str(include_str!("pre_command.sh"));
+    section
+}
+
+fn script_add_command(start_command: &str) -> Section {
+    let mut section = Section::new("command");
+    section.push_str(start_command);
+    section
+}
+
 fn script_add_footer() -> Section {
     let mut section = Section::new("footer");
     section.push_str(include_str!("footer.sh"));
     section
 }
 
-pub fn create_script(phase: &Phases, ctx: &SystemContext) -> anyhow::Result<Option<PathBuf>> {
+pub fn create_script(ctx: &RunContext, start_command: &str) -> anyhow::Result<PathBuf> {
     let p = ctx.printer();
-    p.h2("Create phase script", true);
-    let phase_script = ctx
-        .agent_script_directory()
-        .unwrap()
-        .join(format!("{phase}.sh"));
+    p.h2("Create agent script", true);
+    let script_path = ctx.scratch_directory().unwrap().join("script.sh");
 
-    p.debug(&format!(
-        "Phase script path for {phase:?}: {phase_script:?}"
+    let mut script_contents = String::from("#!/bin/sh -e\n");
+
+    script_contents += &script_add_header().extract();
+    script_contents += &script_add_phase_definitions().extract();
+    script_contents += &script_add_command_definitions(ctx)?.extract();
+    script_contents += &script_add_system_environment(ctx).extract();
+    script_contents += &script_add_pre_command().extract();
+    script_contents += &script_add_command(start_command).extract();
+    script_contents += &script_add_footer().extract();
+
+    let mut output = std::fs::File::create(&script_path)
+        .context(format!("Failed to write agent script file {script_path:?}"))?;
+    write!(output, "{script_contents}")
+        .context(format!("Failed to write agent script into {script_path:?}"))?;
+
+    p.trace(&format!(
+        "Full agent script at {script_path:?}:\n{script_contents}"
     ));
 
-    let mut script = String::new();
-
-    script += &script_add_header().extract();
-    script += &script_add_command_definitions("test", phase, ctx)?.extract();
-    script += &script_add_system_environment(ctx).extract();
-    script += &script_add_footer().extract();
-
-    let mut output = std::fs::File::create(&phase_script).context(format!(
-        "Failed to write phase script file {phase_script:?}"
-    ))?;
-    write!(output, "{script}").context(format!("Failed to write script into {phase_script:?}"))?;
-
-    p.trace(&format!("Full phase script:\n{script}"));
-
-    Ok(Some(phase_script))
+    Ok(script_path)
 }
 
 #[cfg(test)]

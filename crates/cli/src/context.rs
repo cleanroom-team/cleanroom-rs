@@ -191,27 +191,25 @@ pub struct Context {
 }
 
 #[derive(Clone, Debug)]
-pub struct SystemContext {
+pub struct RunContext {
     commands: crate::commands::CommandManager,
     printer: Rc<crate::printer::Printer>,
     variables: ContextMap,
 }
 
-const AGENT_SCRIPT_DIR: &str = "AGENT_SCRIPT_DIR";
 const ARTIFACT_DIR: &str = "ARTIFACT_DIR";
 const BUSYBOX_BINARY: &str = "BUSYBOX_BINARY";
 const MY_BINARY: &str = "MY_BINARY";
 const ROOT_DIR: &str = "ROOT_DIR";
 const SCRATCH_DIR: &str = "SCRATCH_DIR";
-const SYSTEM_NAME: &str = "SYSTEM_NAME";
 const TIMESTAMP: &str = "TIMESTAMP";
 const VERSION: &str = "VERSION";
 const WORK_DIR: &str = "WORK_DIR";
 
 impl Context {
     #[cfg(test)]
-    pub fn test_system(&self) -> SystemContext {
-        let mut ctx = SystemContext {
+    pub fn test_system(&self) -> RunContext {
+        let mut ctx = RunContext {
             commands: self.commands.build(),
             printer: self.printer.clone(),
             variables: self.variables.clone(),
@@ -220,13 +218,10 @@ impl Context {
         ctx.set(BUSYBOX_BINARY, "/usr/bin/busybox", true, true)
             .unwrap();
         ctx.set(MY_BINARY, "/foo/agent", true, true).unwrap();
-        ctx.set(AGENT_SCRIPT_DIR, "/foo/agent_scripts", true, true)
-            .unwrap();
         ctx.set(ARTIFACT_DIR, "/foo/artifacts", true, true).unwrap();
         ctx.set(ROOT_DIR, "/foo/work/XXXX/root_fs", true, true)
             .unwrap();
         ctx.set(SCRATCH_DIR, "/foo/work/XXXX", true, true).unwrap();
-        ctx.set(SYSTEM_NAME, "test_system", true, false).unwrap();
         ctx.set(WORK_DIR, "/foo/work", true, true).unwrap();
 
         ctx
@@ -243,28 +238,23 @@ impl Context {
     // Setter:
     pub fn set_system(
         &self,
-        name: &str,
         work_directory: &Path,
         artifact_directory: &Path,
         busybox_binary: &Path,
         myself: &Path,
-    ) -> anyhow::Result<SystemContext> {
+    ) -> anyhow::Result<RunContext> {
         let artifact_directory = util::resolve_directory(artifact_directory)
             .context("Failed to resolve work directory")?;
         let work_directory =
             util::resolve_directory(work_directory).context("Failed to resolve work directory")?;
 
-        let scratch_directory = work_directory.join(uuid::Uuid::new_v4().to_string());
+        let scratch_directory = work_directory.join(format!("scratch-{}", uuid::Uuid::new_v4()));
         std::fs::create_dir(&scratch_directory)
             .context("Failed to create scratch directory in work directory")?;
 
         let root_directory = scratch_directory.join("root_fs");
         std::fs::create_dir(&root_directory)
             .context("Failed to create root directory in scratch directory")?;
-
-        let agent_script_directory = scratch_directory.join("agent_scripts");
-        std::fs::create_dir(&agent_script_directory)
-            .context("Failed to create agent script directory in scratch directory")?;
 
         let busybox_binary = busybox_binary
             .canonicalize()
@@ -280,7 +270,7 @@ impl Context {
             return Err(anyhow!("{myself:?} is no file or not executable"));
         }
 
-        let mut ctx = SystemContext {
+        let mut ctx = RunContext {
             commands: self.commands.build(),
             printer: self.printer.clone(),
             variables: self.variables.clone(),
@@ -290,20 +280,12 @@ impl Context {
             .unwrap();
         ctx.set_raw(MY_BINARY, myself.as_os_str(), true, true)
             .unwrap();
-        ctx.set_raw(
-            AGENT_SCRIPT_DIR,
-            agent_script_directory.as_os_str(),
-            true,
-            true,
-        )
-        .unwrap();
         ctx.set_raw(ARTIFACT_DIR, artifact_directory.as_os_str(), true, true)
             .unwrap();
         ctx.set_raw(ROOT_DIR, root_directory.as_os_str(), true, true)
             .unwrap();
         ctx.set_raw(SCRATCH_DIR, scratch_directory.as_os_str(), true, true)
             .unwrap();
-        ctx.set(SYSTEM_NAME, name, true, false).unwrap();
         ctx.set_raw(WORK_DIR, work_directory.as_os_str(), true, true)
             .unwrap();
 
@@ -335,7 +317,7 @@ impl Context {
     }
 }
 
-impl std::fmt::Display for SystemContext {
+impl std::fmt::Display for RunContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "SystemContext {{")?;
         if self.variables.is_empty() {
@@ -352,14 +334,10 @@ impl std::fmt::Display for SystemContext {
     }
 }
 
-impl SystemContext {
+impl RunContext {
     // Getters:
     pub fn printer(&self) -> Rc<crate::printer::Printer> {
         self.printer.clone()
-    }
-
-    pub fn agent_script_directory(&self) -> Option<PathBuf> {
-        self.get_raw(AGENT_SCRIPT_DIR).map(PathBuf::from)
     }
 
     pub fn artifact_directory(&self) -> Option<PathBuf> {
@@ -380,10 +358,6 @@ impl SystemContext {
 
     pub fn scratch_directory(&self) -> Option<PathBuf> {
         self.get_raw(SCRATCH_DIR).map(PathBuf::from)
-    }
-
-    pub fn system_name(&self) -> Option<String> {
-        self.get(SYSTEM_NAME)
     }
 
     pub fn timestamp(&self) -> String {

@@ -1,7 +1,7 @@
 // Copyright © Tobias Hunger <tobias.hunger@gmail.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::context::SystemContext;
+use crate::context::RunContext;
 
 use anyhow::Context;
 use contained_command::{Binding, Command, Nspawn};
@@ -16,7 +16,7 @@ const DEFAULT_MACHINE_ID: [u8; 32] = [
     b'9', b'7', b'e', b'1', b'd', b'f', b'5', b'e', b'b', b'3', b'b', b'2', b'6', b'4', b'2', b'2',
 ];
 
-fn parse_stdout(m: &str, command_prefix: &str, ctx: &mut SystemContext) -> bool {
+fn parse_stdout(m: &str, command_prefix: &str, ctx: &mut RunContext) -> bool {
     let p = ctx.printer();
     let Some(cmd) = m.strip_prefix(command_prefix) else {
         return false;
@@ -54,7 +54,7 @@ fn parse_stdout(m: &str, command_prefix: &str, ctx: &mut SystemContext) -> bool 
     } else if let Some(status) = cmd.strip_prefix("STATUS ") {
         let status = status.trim();
         let status = status.trim_matches('"');
-        ctx.printer().h3(status, false);
+        ctx.printer().h3(status, true);
     } else {
         p.error(&format!("Agent asked to process unknown command {cmd:?}"))
     }
@@ -62,59 +62,60 @@ fn parse_stdout(m: &str, command_prefix: &str, ctx: &mut SystemContext) -> bool 
 }
 
 #[allow(clippy::needless_pass_by_ref_mut)] // FIXME: It's not useless: It's passed on to parse_stdout!
-pub async fn run_agent(phase: &crate::Phases, ctx: &mut SystemContext) -> anyhow::Result<()> {
+pub async fn run_agent(ctx: &mut RunContext, command: &str) -> anyhow::Result<()> {
     let p = ctx.printer();
     p.h1("Run Agent", true);
 
-    let Some(phase_script) =
-        crate::scripts::create_script(phase, ctx).context("Failed to create phase script")?
-    else {
-        return Ok(());
-    };
+    for phase in crate::Phases::iter() {
+        let agent_script =
+            crate::scripts::create_script(ctx, command).context("Failed to create agent script")?;
 
-    p.h2("Run in container", true);
-    let runner = Nspawn::default_runner(&ctx.root_directory().unwrap())?
-        .machine_id(DEFAULT_MACHINE_ID)
-        .binding(Binding::ro(
-            &phase_script,
-            &PathBuf::from("/clrm/script.sh"),
-        ))
-        .binding(Binding::ro(
-            &ctx.my_binary().unwrap(),
-            &PathBuf::from("/clrm/agent"),
-        ))
-        .binding(Binding::ro(
-            &ctx.busybox_binary().unwrap(),
-            &PathBuf::from("/clrm/busybox"),
-        ))
-        .binding(Binding::ro(
-            &phase_script,
-            &PathBuf::from("/clrm/script.sh"),
-        ));
+        p.h2("Run in container", true);
+        let runner = Nspawn::default_runner(&ctx.root_directory().unwrap())?
+            .machine_id(DEFAULT_MACHINE_ID)
+            .binding(Binding::ro(
+                &agent_script,
+                &PathBuf::from("/clrm/script.sh"),
+            ))
+            .binding(Binding::ro(
+                &ctx.my_binary().unwrap(),
+                &PathBuf::from("/clrm/agent"),
+            ))
+            .binding(Binding::ro(
+                &ctx.busybox_binary().unwrap(),
+                &PathBuf::from("/clrm/busybox"),
+            ))
+            .binding(Binding::ro(
+                &agent_script,
+                &PathBuf::from("/clrm/script.sh"),
+            ));
 
-    let command_prefix = uuid::Uuid::new_v4().to_string();
-    let command = {
-        let mut command = Command::new("/clrm/agent");
-        command.arg("agent");
-        command.arg(&format!("--command-prefix={command_prefix}"));
-        command
-    };
+        let command_prefix = uuid::Uuid::new_v4().to_string();
+        let command = {
+            let mut command = Command::new("/clrm/agent");
+            command.arg("agent");
+            command.arg(&format!("--command-prefix={command_prefix}"));
+            command.arg(&phase.to_string());
+            command
+        };
 
-    let command_prefix = format!("{command_prefix}: ");
-    runner
-        .run(
-            &command,
-            &|m| p.trace(m),
-            &|m| p.error(m),
-            &mut |m| {
-                if !parse_stdout(m, &command_prefix, ctx) {
-                    p.print_stdout(m);
-                }
-            },
-            &mut |m| p.print_stderr(m),
-        )
-        .await
-        .context("Failed to containerize")?;
+        let command_prefix = format!("{command_prefix}: ");
+        runner
+            .run(
+                &command,
+                &|m| p.trace(m),
+                &|m| p.error(m),
+                &mut |m| {
+                    if !parse_stdout(m, &command_prefix, ctx) {
+                        p.print_stdout(m);
+                    }
+                },
+                &mut |m| p.print_stderr(m),
+            )
+            .await
+            .context("Failed to containerize")?;
+    }
+
     Ok(())
 }
 
@@ -129,7 +130,7 @@ mod tests {
         command_prefix: &str,
         expect_handled: bool,
         expect_error: bool,
-    ) -> crate::context::SystemContext {
+    ) -> crate::context::RunContext {
         let printer = Printer::new(&LogLevel::Off, false);
 
         let ctx = crate::context::ContextBuilder::new(printer).build();

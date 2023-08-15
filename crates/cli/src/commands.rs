@@ -5,7 +5,7 @@ use std::{collections::BTreeMap, ffi::OsStr, path::Path, rc::Rc};
 
 use anyhow::{anyhow, Context};
 
-use crate::{printer::Printer, Phases, SubPhases};
+use crate::printer::Printer;
 
 fn validate_command_name(name: &str) -> anyhow::Result<()> {
     if name
@@ -20,22 +20,6 @@ fn validate_command_name(name: &str) -> anyhow::Result<()> {
         Ok(())
     } else {
         Err(anyhow!("Invalid command name {name}"))
-    }
-}
-
-fn validate_phase_name(phase_name: &str) -> anyhow::Result<()> {
-    if Phases::iter().any(|p| p.to_string() == phase_name) {
-        Ok(())
-    } else {
-        Err(anyhow!("{phase_name} is not a valid phase name"))
-    }
-}
-
-fn validate_sub_phase_name(sub_phase_name: &str) -> anyhow::Result<()> {
-    if SubPhases::iter().any(|p| p.to_string() == sub_phase_name) {
-        Ok(())
-    } else {
-        Err(anyhow!("{sub_phase_name} is not a valid sub-phase name"))
     }
 }
 
@@ -72,26 +56,14 @@ pub struct Command {
     #[serde(default)]
     pub can_alias: bool,
     /// Input to the command
+    #[serde(default)]
     inputs: Vec<Input>,
 
-    /// Script snippets
-    #[serde(default)]
-    phases: BTreeMap<String, String>,
+    /// Script snippet
+    pub script: String,
 }
 
 impl Command {
-    pub fn snippet(&self, phase: &Phases, sub_phase: &SubPhases) -> Option<&String> {
-        let key = {
-            let sp = phase.to_string();
-            if sub_phase == &SubPhases::Main {
-                sp
-            } else {
-                format!("{sp}_{}", sub_phase)
-            }
-        };
-        self.phases.get(&key)
-    }
-
     pub fn inputs(&self) -> impl Iterator<Item = &Input> {
         self.inputs.iter()
     }
@@ -117,14 +89,6 @@ impl std::fmt::Display for Command {
                 writeln!(f, "    {}{}", i.name(), help)?
             }
         }
-        if self.phases.is_empty() {
-            writeln!(f, "  phases: <none>")?;
-        } else {
-            writeln!(f, "  phases:")?;
-            for p in self.phases.keys() {
-                writeln!(f, "    {p}")?;
-            }
-        }
         writeln!(f)
     }
 }
@@ -134,7 +98,6 @@ impl std::fmt::Display for Command {
 struct TomlCommand {
     /// The `Data`about the `Command`
     command: Command,
-    phases: BTreeMap<String, String>,
 }
 
 impl TomlCommand {
@@ -142,10 +105,8 @@ impl TomlCommand {
         let contents = std::fs::read_to_string(command)
             .context(format!("Failed to read command definition in {command:?}"))?;
 
-        let mut header = toml::from_str::<TomlCommand>(&contents)
+        let header = toml::from_str::<TomlCommand>(&contents)
             .context(format!("Failed to parse command from {command:?}"))?;
-
-        header.command.phases = header.phases;
 
         Ok(header.command)
     }
@@ -183,20 +144,6 @@ impl CommandManagerBuilder {
                 let name = p.file_stem().unwrap().to_string_lossy().to_string();
                 validate_command_name(&name)?;
 
-                for phase_name in cmd.phases.keys() {
-                    let (pn, spn) = {
-                        if let Some((pn, spn)) = phase_name.split_once('_') {
-                            (pn, Some(spn))
-                        } else {
-                            (phase_name.as_ref(), None)
-                        }
-                    };
-                    validate_phase_name(pn)?;
-                    if let Some(spn) = spn {
-                        validate_sub_phase_name(spn)?;
-                    }
-                }
-
                 if self.commands.insert(name.clone(), Rc::new(cmd)).is_some() {
                     printer.info(&format!("Re-defined command {}", name));
                 }
@@ -222,6 +169,10 @@ impl CommandManager {
         } else {
             Err(anyhow::anyhow!("Command {name:?} not found"))
         }
+    }
+
+    pub fn commands(&self) -> impl Iterator<Item = (&String, &Rc<Command>)> {
+        self.commands.iter()
     }
 
     pub fn is_empty(&self) -> bool {

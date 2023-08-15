@@ -1,90 +1,60 @@
 // Copyright © Tobias Hunger <tobias.hunger@gmail.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+use clap::ValueEnum;
+
+#[derive(Debug, Clone, Eq, PartialEq, clap::ValueEnum)]
+#[clap(rename_all = "snake_case")]
 pub enum Phases {
     Prepare,
     Install,
     Polish,
     Test,
-    GenerateArtifacts,
+    BuildArtifacts,
     TestArtifacts,
+}
+
+impl Phases {
+    pub fn iter() -> impl Iterator<Item = &'static Phases> {
+        Phases::value_variants().iter()
+    }
 }
 
 impl std::fmt::Display for Phases {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let debug = format!("{:?}", self).to_lowercase();
-        write!(f, "{debug}")
+        write!(
+            f,
+            "{}",
+            self.to_possible_value()
+                .map(|pv| pv.get_name().to_string())
+                .unwrap_or_else(|| "<unknown>".to_string())
+        )
     }
 }
 
-impl Phases {
-    fn iter() -> PhasesIter {
-        PhasesIter(None)
-    }
-}
-
-pub struct PhasesIter(Option<Phases>);
-
-impl Iterator for PhasesIter {
-    type Item = Phases;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let next = match self.0 {
-            None => Some(Phases::Prepare),
-            Some(Phases::Prepare) => Some(Phases::Install),
-            Some(Phases::Install) => Some(Phases::Polish),
-            Some(Phases::Polish) => Some(Phases::Test),
-            Some(Phases::Test) => Some(Phases::GenerateArtifacts),
-            Some(Phases::GenerateArtifacts) => Some(Phases::TestArtifacts),
-            Some(Phases::TestArtifacts) => None,
-        };
-        if next.is_some() {
-            self.0 = next.clone();
-        }
-        next
-    }
-}
-
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, clap::ValueEnum)]
+#[clap(rename_all = "snake_case")]
 pub enum SubPhases {
     Pre,
     Main,
     Post,
 }
 
+impl SubPhases {
+    pub fn iter() -> impl Iterator<Item = &'static SubPhases> {
+        SubPhases::value_variants().iter()
+    }
+}
+
 impl std::fmt::Display for SubPhases {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            SubPhases::Pre => write!(f, "pre"),
-            SubPhases::Main => write!(f, "main"),
-            SubPhases::Post => write!(f, "post"),
-        }
-    }
-}
-
-impl SubPhases {
-    pub fn iter() -> SubPhasesIter {
-        SubPhasesIter(None)
-    }
-}
-
-pub struct SubPhasesIter(Option<SubPhases>);
-
-impl Iterator for SubPhasesIter {
-    type Item = SubPhases;
-
-    fn next(&mut self) -> Option<Self::Item> {
-        let next = match self.0 {
-            None => Some(SubPhases::Pre),
-            Some(SubPhases::Pre) => Some(SubPhases::Main),
-            Some(SubPhases::Main) => Some(SubPhases::Post),
-            Some(SubPhases::Post) => None,
-        };
-        if next.is_some() {
-            self.0 = next.clone();
-        }
-        next
+        write!(
+            f,
+            "{}",
+            self.to_possible_value()
+                .map(|pv| pv.get_name().to_string())
+                .unwrap_or_else(|| "<unknown>".to_string())
+        )
     }
 }
 

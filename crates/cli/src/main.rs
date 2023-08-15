@@ -15,6 +15,22 @@ struct Arguments {
     /// Set the log level
     log_level: cli::printer::LogLevel,
 
+    /// The command to run
+    #[command(subcommand)]
+    command: Commands,
+}
+
+#[derive(Args, Debug)]
+struct AgentMode {
+    /// The prefix used to send commands to the agent runner
+    #[arg(long = "command-prefix", short)]
+    command_prefix: String,
+    /// The phase to run
+    phase: cli::Phases,
+}
+
+#[derive(Args, Debug)]
+struct RunMode {
     /// The directory to create temporary files in
     #[arg(long = "work-directory", default_value = "./work")]
     work_directory: PathBuf,
@@ -35,48 +51,32 @@ struct Arguments {
     #[arg(long = "busybox-binary", default_value = "/usr/bin/busybox")]
     busybox_binary: PathBuf,
 
-    /// The command to run
-    #[command(subcommand)]
-    command: Option<Commands>,
-}
-
-#[derive(Args, Debug)]
-struct AgentMode {
-    #[arg(long = "command-prefix", short)]
-    command_prefix: String,
+    /// The commands to run
+    command: String,
 }
 
 #[derive(Subcommand, Debug)]
 #[command()]
 enum Commands {
+    /// Run as an agent inside a container. For internal use
     Agent(AgentMode),
+    /// Run some command
+    Run(RunMode),
 }
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let args = Arguments::parse();
-
-    if let Some(Commands::Agent(agent)) = args.command {
-        return cli::agent::run(&agent.command_prefix);
-    }
-
-    let printer = Printer::new(&args.log_level, true);
-
-    printer.h1("Setup", true);
-    printer.h2("Bootstrap", true);
-
-    printer.trace("Logging is set up and ready.");
-    printer.debug(&format!("Command line arguments: {args:?}"));
-
+fn create_system_context(
+    printer: Printer,
+    run: &RunMode,
+) -> anyhow::Result<cli::context::RunContext> {
     let myself = std::env::current_exe().context("Failed to find current executable path")?;
 
     printer.h2("system context", true);
     let mut base_ctx = {
         let mut builder = cli::context::ContextBuilder::new(printer);
-        if let Some(ts) = &args.timestamp {
+        if let Some(ts) = &run.timestamp {
             builder = builder.timestamp(ts.clone())?;
         }
-        if let Some(v) = &args.artifact_version {
+        if let Some(v) = &run.artifact_version {
             builder = builder.version(v.clone())?;
         }
 
@@ -91,21 +91,44 @@ async fn main() -> anyhow::Result<()> {
         &printer,
     )?;
 
-    let mut ctx = base_ctx
+    let ctx = base_ctx
         .set_system(
-            "test_system",
-            &args.work_directory,
-            &args.artifact_directory,
-            &args.busybox_binary,
+            &run.work_directory,
+            &run.artifact_directory,
+            &run.busybox_binary,
             &myself,
         )
         .context("Failed to set up system context")?;
 
     printer.debug(&format!("{ctx}"));
 
-    printer.h1("Run agent", true);
-    cli::agent_runner::run_agent(&cli::Phases::Test, &mut ctx)
-        .await
-        .context("Failed to drive agent")?;
-    Ok(())
+    Ok(ctx)
+}
+
+#[tokio::main]
+async fn main() -> anyhow::Result<()> {
+    let args = Arguments::parse();
+
+    match &args.command {
+        Commands::Agent(agent) => return cli::agent::run(&agent.command_prefix, &agent.phase),
+        Commands::Run(run) => {
+            let printer = Printer::new(&args.log_level, true);
+
+            printer.h1("Setup", true);
+            printer.h2("Bootstrap", true);
+
+            printer.trace("Logging is set up and ready.");
+            printer.debug(&format!("Command line arguments: {args:?}"));
+
+            let mut ctx =
+                create_system_context(printer, run).context("Failed to create system context")?;
+
+            let printer = ctx.printer();
+            printer.h1("Run agent", true);
+            cli::agent_runner::run_agent(&mut ctx, &run.command)
+                .await
+                .context("Failed to drive agent")?;
+            Ok(())
+        }
+    }
 }
