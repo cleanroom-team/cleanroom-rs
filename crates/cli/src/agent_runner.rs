@@ -1,10 +1,10 @@
 // Copyright © Tobias Hunger <tobias.hunger@gmail.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::context::RunContext;
+use crate::{context::RunContext, Phases};
 
 use anyhow::Context;
-use contained_command::{Binding, Command, Nspawn};
+use contained_command::{Binding, Command, Nspawn, RunEnvironment};
 
 use std::path::PathBuf;
 
@@ -75,24 +75,35 @@ pub async fn run_agent(ctx: &mut RunContext, command: &str) -> anyhow::Result<()
             crate::scripts::create_script(ctx, command).context("Failed to create agent script")?;
 
         p.h2("Run in container", true);
-        let runner = Nspawn::default_runner(&ctx.root_directory().unwrap())?
-            .machine_id(DEFAULT_MACHINE_ID)
-            .binding(Binding::ro(
-                &agent_script,
-                &PathBuf::from("/clrm/script.sh"),
-            ))
-            .binding(Binding::ro(
-                &ctx.my_binary().unwrap(),
-                &PathBuf::from("/clrm/agent"),
-            ))
-            .binding(Binding::ro(
-                &ctx.busybox_binary().unwrap(),
-                &PathBuf::from("/clrm/busybox"),
-            ))
-            .binding(Binding::ro(
-                &agent_script,
-                &PathBuf::from("/clrm/script.sh"),
-            ));
+        let runner = {
+            let runner = if phase == &Phases::Install
+                || phase == &Phases::BuildArtifacts
+                || phase == &Phases::TestArtifacts
+            {
+                Nspawn::default_runner(ctx.bootstrap_environment().clone())?
+                    .env("CLRM_CONTAINER", "bootstrap")
+            } else {
+                Nspawn::default_runner(RunEnvironment::Directory(
+                    ctx.root_directory().unwrap().clone(),
+                ))?
+                .env("CLRM_CONTAINER", "root_fs")
+            };
+
+            runner
+                .machine_id(DEFAULT_MACHINE_ID)
+                .binding(Binding::ro(
+                    &ctx.my_binary().unwrap(),
+                    &PathBuf::from("/clrm/agent"),
+                ))
+                .binding(Binding::ro(
+                    &ctx.busybox_binary().unwrap(),
+                    &PathBuf::from("/clrm/busybox"),
+                ))
+                .binding(Binding::ro(
+                    &agent_script,
+                    &PathBuf::from("/clrm/script.sh"),
+                ))
+        };
 
         let command_prefix = uuid::Uuid::new_v4().to_string();
         let command = {

@@ -1,0 +1,18 @@
+[command]
+help = """Enable debugging in the final image"""
+script = """
+    assert_distribution_initialized
+
+    if [ "${CURRENT_PHASE}" = "${PHASE_PREPARE}" ]; then
+        debug_cmdline="debug systemd.log_level=debug rd.systemd.debug_shell=1"
+        # debug_cmdline="debug systemd.log_level=debug systemd.log_target=console console=tty1 console=ttyS0,38400n8 rd.systemd.debug_shell=1 systemd.debug_shell=1"
+
+        if [ -z "${KERNEL_CMDLINE}" ]; then
+            export_var KERNEL_CMDLINE "${debug_cmdline}"
+        else
+            export_var KERNEL_CMDLINE "${KERNEL_CMDLINE} ${debug_cmdline}"
+        fi
+
+        export_constant CLRM_DEBUG_MODE on
+    fi
+"""

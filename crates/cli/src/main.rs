@@ -47,9 +47,17 @@ struct RunMode {
     #[arg(long = "artifact-version")]
     artifact_version: Option<String>,
 
-    /// The version string to use (defaults to timestamp if unset)
+    /// The busybox binary to use
     #[arg(long = "busybox-binary", default_value = "/usr/bin/busybox")]
     busybox_binary: PathBuf,
+
+    /// A disk image to use as a bootstrap environment (conflicts with --bootstrap-directory)
+    #[arg(long = "bootstrap-image", conflicts_with = "bootstrap_directory")]
+    bootstrap_image: Option<PathBuf>,
+
+    /// A bootstrap environment installed into a directory (conflicts with --bootstrap-image)
+    #[arg(long = "bootstrap-directory")]
+    bootstrap_directory: Option<PathBuf>,
 
     /// The commands to run
     command: String,
@@ -69,6 +77,9 @@ fn create_system_context(
     run: &RunMode,
 ) -> anyhow::Result<cli::context::RunContext> {
     let myself = std::env::current_exe().context("Failed to find current executable path")?;
+
+    let bootstrap_environment =
+        cli::RunEnvironment::new(&run.bootstrap_directory, &run.bootstrap_image)?;
 
     printer.h2("system context", true);
     let mut base_ctx = {
@@ -95,6 +106,7 @@ fn create_system_context(
             &run.artifact_directory,
             &run.busybox_binary,
             &myself,
+            bootstrap_environment,
         )
         .context("Failed to set up system context")?;
 

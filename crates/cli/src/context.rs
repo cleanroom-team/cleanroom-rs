@@ -11,6 +11,7 @@ use std::{
 };
 
 use anyhow::{anyhow, Context as AhContext};
+use contained_command::RunEnvironment;
 
 #[derive(Clone, Debug)]
 pub struct ContextEntry {
@@ -194,6 +195,7 @@ pub struct Context {
 pub struct RunContext {
     commands: crate::commands::CommandManager,
     printer: Rc<crate::printer::Printer>,
+    bootstrap_environment: crate::RunEnvironment,
     variables: ContextMap,
 }
 
@@ -213,6 +215,9 @@ impl Context {
             commands: self.commands.build(),
             printer: self.printer.clone(),
             variables: self.variables.clone(),
+            bootstrap_environment: crate::RunEnvironment::Directory(PathBuf::from(
+                "/tmp/bootstrap_dir",
+            )),
         };
 
         ctx.set(BUSYBOX_BINARY, "/usr/bin/busybox", true, true)
@@ -242,6 +247,7 @@ impl Context {
         artifact_directory: &Path,
         busybox_binary: &Path,
         myself: &Path,
+        bootstrap_environment: crate::RunEnvironment,
     ) -> anyhow::Result<RunContext> {
         let artifact_directory = util::resolve_directory(artifact_directory)
             .context("Failed to resolve work directory")?;
@@ -274,6 +280,7 @@ impl Context {
             commands: self.commands.build(),
             printer: self.printer.clone(),
             variables: self.variables.clone(),
+            bootstrap_environment,
         };
 
         ctx.set_raw(BUSYBOX_BINARY, busybox_binary.as_os_str(), true, true)
@@ -336,6 +343,9 @@ impl std::fmt::Display for RunContext {
 
 impl RunContext {
     // Getters:
+    pub fn bootstrap_environment(&self) -> &RunEnvironment {
+        &self.bootstrap_environment
+    }
     pub fn printer(&self) -> Rc<crate::printer::Printer> {
         self.printer.clone()
     }

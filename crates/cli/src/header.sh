@@ -14,7 +14,7 @@ status() {
 	echo "${__command_prefix}: STATUS \"${message}\""
 }
 
-status "Setup: ${CURRENT_PHASE}"
+status "Setup: ${CURRENT_PHASE} (${CLRM_CONTAINER})"
 
 export_constant() {
 	key="${1}"

@@ -39,6 +39,9 @@ pub mod context;
 pub mod printer;
 pub mod scripts;
 
+// Re-Exports:
+pub use contained_command::RunEnvironment;
+
 #[cfg(test)]
 mod tests {
     use std::collections::HashSet;

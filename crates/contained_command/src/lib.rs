@@ -27,8 +27,8 @@ use std::{
 /// The `Error` enum for this crate
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    #[error("{command:?} {} failed with exit status {status:?}: {message}", args.join(&OsString::from(" ")).to_string_lossy())]
     /// A command was not executable
+    #[error("{command:?} {} failed with exit status {status:?}: {message}", args.join(&OsString::from(" ")).to_string_lossy())]
     CommandFailed {
         /// The command that failed
         command: PathBuf,
@@ -39,21 +39,24 @@ pub enum Error {
         /// Exit code (if any)
         status: Option<i32>,
     },
-    #[error("\"{0:?}\" is not executable")]
     /// A command was not executable
+    #[error("\"{0:?}\" is not executable")]
     CommandNotExecutable(PathBuf),
-    #[error("Failed to set up containment: {0}")]
     /// Failed to set up containment
+    #[error("Failed to set up containment: {0}")]
     ContainmentFailure(String),
-    #[error(transparent)]
     /// Some low level error bubbled up
+    #[error(transparent)]
     FsError(#[from] std::io::Error),
-    #[error(transparent)]
     /// Some low level error bubbled up
+    #[error(transparent)]
     UtilError(#[from] util::Error),
-    #[error("Failed to get root access: {0}")]
     /// `root` credentials are required
+    #[error("Failed to get root access: {0}")]
     RootNeeded(String),
+    /// Run environment validation failed
+    #[error("Run environment validation failed: {0}")]
+    RunEnvironment(String),
 }
 
 /// `contained_command` `Result` type
@@ -141,6 +144,86 @@ impl Binding {
             sources: sources.iter().map(|p| p.as_ref().to_path_buf()).collect(),
             target: target.as_ref().to_path_buf(),
         })
+    }
+}
+
+/// The environment to use as a container
+#[derive(Clone, Debug)]
+pub enum RunEnvironment {
+    /// Run inside an file system image
+    Image(PathBuf),
+    /// Run inside an directory
+    Directory(PathBuf),
+}
+
+fn validate_image(img: &Path) -> Result<PathBuf> {
+    let img = img.canonicalize().map_err(|e| {
+        Error::RunEnvironment(format!(
+            "Failed to canonicalize bootstrap image {img:?}: {e}"
+        ))
+    })?;
+    if img.is_file() {
+        Ok(img)
+    } else {
+        Err(Error::RunEnvironment(format!(
+            "Bootstrap image {img:?} is not a file"
+        )))
+    }
+}
+
+fn validate_directory(dir: &Path) -> Result<PathBuf> {
+    let dir = dir.canonicalize().map_err(|e| {
+        Error::RunEnvironment(format!(
+            "Failed to canonicalize bootstrap directory {dir:?}: {e}"
+        ))
+    })?;
+    if dir.is_dir() {
+        Ok(dir)
+    } else {
+        Err(Error::RunEnvironment(format!(
+            "Bootstrap directory {dir:?} is not a directory"
+        )))
+    }
+}
+
+impl RunEnvironment {
+    /// Create a new environment with either a directory or an image
+    ///
+    /// # Errors
+    ///
+    /// Things may go wrong...
+    pub fn new(directory: &Option<PathBuf>, image: &Option<PathBuf>) -> Result<Self> {
+        match (directory, image) {
+            (Some(dir), None) => {
+                let dir = validate_directory(dir)?;
+                Ok(RunEnvironment::Directory(dir))
+            }
+            (None, Some(img)) => {
+                let img = validate_image(img)?;
+                Ok(RunEnvironment::Image(img))
+            }
+            _ => Err(Error::RunEnvironment(
+                "Either --bootstrap-directory or --bootstrap-image is needed to `run`".to_string(),
+            )),
+        }
+    }
+
+    /// Validate the environment
+    ///
+    /// # Errors
+    ///
+    /// Things may go wrong...
+    pub fn validate(&self) -> Result<()> {
+        match self {
+            RunEnvironment::Directory(dir) => {
+                let _ = validate_directory(dir)?;
+                Ok(())
+            }
+            RunEnvironment::Image(img) => {
+                let _ = validate_image(img)?;
+                Ok(())
+            }
+        }
     }
 }
 

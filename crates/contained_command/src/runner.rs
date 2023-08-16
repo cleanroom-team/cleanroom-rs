@@ -6,10 +6,12 @@
 use std::{
     ffi::{OsStr, OsString},
     os::unix::{ffi::OsStrExt, fs::MetadataExt, process::ExitStatusExt},
-    path::{Path, PathBuf},
+    path::PathBuf,
 };
 
 use tokio::io::AsyncBufReadExt;
+
+use crate::RunEnvironment;
 
 // ----------------------------------------------------------------------
 // - Runtime:
@@ -34,7 +36,7 @@ pub trait Runtime {
 pub struct Nspawn {
     sudo_binary: Option<PathBuf>,
     nspawn_binary: PathBuf,
-    root_directory: PathBuf,
+    run_environment: RunEnvironment,
 }
 
 impl Nspawn {
@@ -47,14 +49,12 @@ impl Nspawn {
     pub fn custom_binary(
         nspawn_binary: PathBuf,
         sudo_binary: Option<PathBuf>,
-        root_directory: &Path,
+        run_environment: RunEnvironment,
     ) -> crate::Result<Runner<Nspawn>> {
-        let root_directory = util::resolve_directory(root_directory)?;
-        let root_directory = root_directory.canonicalize()?;
         Ok(Runner::new(Nspawn {
             sudo_binary,
             nspawn_binary,
-            root_directory,
+            run_environment,
         }))
     }
 
@@ -63,14 +63,14 @@ impl Nspawn {
     /// # Errors
     ///
     /// Things can go wrong!
-    pub fn default_runner(root_directory: &Path) -> crate::Result<Runner<Nspawn>> {
+    pub fn default_runner(run_environment: RunEnvironment) -> crate::Result<Runner<Nspawn>> {
         let nspawn_binary = util::require_binary("systemd-nspawn")?;
         let sudo_binary = if util::is_effective_root() {
             None
         } else {
             Some(util::require_binary("sudo")?)
         };
-        Self::custom_binary(nspawn_binary, sudo_binary, root_directory)
+        Self::custom_binary(nspawn_binary, sudo_binary, run_environment)
     }
 
     /// Validate values stored in `self`
@@ -89,22 +89,15 @@ impl Nspawn {
                 "Not run as root and no sudo command provided".to_string(),
             ));
         }
-        if !self
-            .root_directory
-            .metadata()
-            .ok()
-            .is_some_and(|md| md.is_dir())
-        {
-            return Err(crate::Error::ContainmentFailure(
-                "\"{root_directory}\" is not a directory".to_string(),
-            ));
-        }
         Ok(())
     }
 
     /// Prepare `root_directory` for nspawn
     fn prepare(&self) -> crate::Result<()> {
-        let usr_dir = self.root_directory.join("usr");
+        let RunEnvironment::Directory(root_dir) = &self.run_environment else {
+            return Ok(());
+        };
+        let usr_dir = root_dir.join("usr");
         if !usr_dir.exists() {
             std::fs::create_dir(usr_dir)?;
         }
@@ -248,9 +241,18 @@ impl Runtime for Nspawn {
             args.push(dir_arg);
         }
 
-        let mut dir_arg = OsString::from("--directory=");
-        dir_arg.push(self.root_directory.as_os_str());
-        args.push(dir_arg);
+        match &self.run_environment {
+            RunEnvironment::Image(i) => {
+                let mut image_arg = OsString::from("--image=");
+                image_arg.push(i.as_os_str());
+                args.push(image_arg);
+            }
+            RunEnvironment::Directory(d) => {
+                let mut dir_arg = OsString::from("--directory=");
+                dir_arg.push(d.as_os_str());
+                args.push(dir_arg);
+            }
+        }
 
         // Actual Command:
         args.push(command.command.as_os_str().to_os_string());
