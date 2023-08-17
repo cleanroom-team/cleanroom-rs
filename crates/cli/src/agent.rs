@@ -6,14 +6,17 @@
 use anyhow::Context;
 
 pub fn run(command_prefix: &str, phase: &crate::Phases) -> anyhow::Result<()> {
-    let mut child = std::process::Command::new("/clrm/busybox")
+    let agent_script = "/tmp/clrm/script.sh";
+    let mut child = std::process::Command::new("/tmp/clrm/busybox")
         .arg("sh")
         .arg("-e")
-        .arg("/clrm/script.sh")
+        .arg(agent_script)
         .arg(command_prefix)
         .arg(phase.to_string())
         .spawn()
-        .context("Failed to start agent script")?;
+        .context(format!(
+            "The agent failed to start the agent script in {agent_script}"
+        ))?;
 
     let exit_status = child
         .wait()

@@ -64,6 +64,10 @@ fn parse_stdout(m: &str, command_prefix: &str, ctx: &mut RunContext) -> bool {
     true
 }
 
+fn run_in_bootstrap(phase: &Phases) -> bool {
+    phase == &Phases::Install || phase == &Phases::BuildArtifacts || phase == &Phases::TestArtifacts
+}
+
 #[allow(clippy::needless_pass_by_ref_mut)] // FIXME: It's not useless: It's passed on to parse_stdout!
 pub async fn run_agent(ctx: &mut RunContext, command: &str) -> anyhow::Result<()> {
     let p = ctx.printer();
@@ -76,38 +80,43 @@ pub async fn run_agent(ctx: &mut RunContext, command: &str) -> anyhow::Result<()
 
         p.h2("Run in container", true);
         let runner = {
-            let runner = if phase == &Phases::Install
-                || phase == &Phases::BuildArtifacts
-                || phase == &Phases::TestArtifacts
-            {
+            let runner = if run_in_bootstrap(phase) {
                 Nspawn::default_runner(ctx.bootstrap_environment().clone())?
+                    // .binding(Binding::tmpfs(&PathBuf::from("/tmp")))
+                    .binding(Binding::rw(
+                        &ctx.root_directory().unwrap(),
+                        &PathBuf::from("/tmp/clrm/root_fs"),
+                    ))
                     .env("CLRM_CONTAINER", "bootstrap")
+                    .env("ROOT_FS", "/tmp/clrm/root_fs")
             } else {
                 Nspawn::default_runner(RunEnvironment::Directory(
                     ctx.root_directory().unwrap().clone(),
                 ))?
+                // .binding(Binding::tmpfs(&PathBuf::from("/tmp")))
                 .env("CLRM_CONTAINER", "root_fs")
+                .env("ROOT_FS", "/")
             };
 
             runner
                 .machine_id(DEFAULT_MACHINE_ID)
                 .binding(Binding::ro(
                     &ctx.my_binary().unwrap(),
-                    &PathBuf::from("/clrm/agent"),
+                    &PathBuf::from("/tmp/clrm/agent"),
                 ))
                 .binding(Binding::ro(
                     &ctx.busybox_binary().unwrap(),
-                    &PathBuf::from("/clrm/busybox"),
+                    &PathBuf::from("/tmp/clrm/busybox"),
                 ))
                 .binding(Binding::ro(
                     &agent_script,
-                    &PathBuf::from("/clrm/script.sh"),
+                    &PathBuf::from("/tmp/clrm/script.sh"),
                 ))
         };
 
         let command_prefix = uuid::Uuid::new_v4().to_string();
         let command = {
-            let mut command = Command::new("/clrm/agent");
+            let mut command = Command::new("/tmp/clrm/agent");
             command.arg("agent");
             command.arg(&format!("--command-prefix={command_prefix}"));
             command.arg(&phase.to_string());

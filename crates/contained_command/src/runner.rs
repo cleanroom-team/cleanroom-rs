@@ -205,7 +205,7 @@ impl Runtime for Nspawn {
 
         args.extend_from_slice(&[
             OsString::from("--quiet"),
-            OsString::from("--volatile=yes"),
+            OsString::from("--ephemeral"),
             OsString::from("--settings=off"),
             OsString::from("--register=off"),
             OsString::from("--resolv-conf=off"),
