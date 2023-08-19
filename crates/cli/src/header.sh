@@ -7,6 +7,11 @@ CURRENT_PHASE="${1}"
 readonly CURRENT_PHASE
 shift
 
+CLRM_DIR="/tmp/clrm"
+readonly CLRM_DIR
+BUSYBOX="${CLRM_DIR}/busybox"
+readonly BUSYBOX
+
 status() {
 	message="${1}"
 	shift
@@ -37,15 +42,6 @@ export_var() {
 	echo "${__command_prefix}: SET \"${key}\"=\"${value}\""
 }
 
-alias_command() {
-	key="${1}"
-	shift
-	value="${1}"
-	shift
-
-	echo "${__command_prefix}: ALIAS \"${key}\"=\"${value}\""
-}
-
 error() {
 	echo "Error in Agent script: ${*}"
 	exit 1
@@ -56,3 +52,13 @@ assert_distribution_initialized() {
 		error "Distribution not yet initialized. Call \"distribution <id>\" first!"
 	fi
 }
+
+bb_mknod() {
+	"${BUSYBOX}" mknod "${@}"
+}
+
+bb_mkdir() {
+	"${BUSYBOX}" mkdir "${@}"
+}
+
+cd "${ROOT_FS}" || error "Failed to cd into ${ROOT_FS}"

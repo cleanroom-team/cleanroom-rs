@@ -5,8 +5,6 @@ use std::{collections::BTreeMap, ffi::OsStr, path::Path};
 
 use anyhow::{anyhow, Context};
 
-use crate::printer::Printer;
-
 static BUILTIN_COMMANDS_DIR: include_dir::Dir<'_> =
     include_dir::include_dir!("$CARGO_MANIFEST_DIR/commands");
 
@@ -55,20 +53,33 @@ impl Input {
 pub struct Command {
     /// Help about the `Command`
     help: Option<String>,
-    /// Can this command get aliased?
-    #[serde(default)]
-    pub can_alias: bool,
     /// Input to the command
     #[serde(default)]
     inputs: Vec<Input>,
 
     /// Script snippet
     pub script: String,
+
+    /// The source of the command itself.
+    #[serde(skip)]
+    source_location: String,
+
+    /// The source of the command itself.
+    #[serde(skip)]
+    source: String,
+
+    /// The definition this command overwrites
+    #[serde(skip)]
+    overwrote_definition_in: Option<String>,
 }
 
 impl Command {
     pub fn inputs(&self) -> impl Iterator<Item = &Input> {
         self.inputs.iter()
+    }
+
+    pub fn dump_source(&self) -> &str {
+        &self.source
     }
 }
 
@@ -92,6 +103,9 @@ impl std::fmt::Display for Command {
                 writeln!(f, "    {}{}", i.name(), help)?
             }
         }
+        if let Some(overwrote) = &self.overwrote_definition_in {
+            writeln!(f, "  *** Overwrote definition in {overwrote} ***")?;
+        }
         writeln!(f)
     }
 }
@@ -108,12 +122,16 @@ impl TomlCommand {
         let contents = std::fs::read_to_string(command)
             .context(format!("Failed to read command definition in {command:?}"))?;
 
-        Self::from_str(&contents).context(format!("Failed to parse {command:?}"))
+        Self::from_str(&contents, &command.to_string_lossy())
+            .context(format!("Failed to parse {command:?}"))
     }
 
-    fn from_str(contents: &str) -> anyhow::Result<Command> {
-        let header = toml::from_str::<TomlCommand>(contents)
+    fn from_str(contents: &str, source_location: &str) -> anyhow::Result<Command> {
+        let mut header = toml::from_str::<TomlCommand>(contents)
             .context("Failed to parse command definition")?;
+
+        header.command.source_location = source_location.to_string();
+        header.command.source = contents.to_string();
 
         Ok(header.command)
     }
@@ -135,7 +153,7 @@ impl Default for CommandManagerBuilder {
             let contents = f.contents_utf8().unwrap();
             let name = f.path().file_stem().unwrap().to_string_lossy().to_string();
 
-            let cmd = TomlCommand::from_str(contents).unwrap();
+            let cmd = TomlCommand::from_str(contents, "<builtin>").unwrap();
             result.commands.insert(name, cmd);
         }
 
@@ -150,12 +168,7 @@ impl CommandManagerBuilder {
         }
     }
 
-    pub fn scan_for_commands(
-        &mut self,
-        command_directory: &Path,
-        can_alias: bool, // Allows to force aliasing to off for untrusted commands
-        printer: &Printer,
-    ) -> anyhow::Result<()> {
+    pub fn scan_for_commands(&mut self, command_directory: &Path) -> anyhow::Result<()> {
         let contents = std::fs::read_dir(command_directory).context(format!(
             "Failed to scan for commands in {command_directory:?}"
         ))?;
@@ -166,17 +179,14 @@ impl CommandManagerBuilder {
                 let mut cmd = TomlCommand::read_from_file(&p)
                     .context(format!("Failed to read command from {p:?}"))?;
 
-                cmd.can_alias = cmd.can_alias && can_alias; // Force aliasing off
                 let name = p.file_stem().unwrap().to_string_lossy().to_string();
                 validate_command_name(&name)?;
 
-                if self.commands.insert(name.clone(), cmd).is_some() {
-                    printer.info(&format!("Re-defined command {}", name));
+                if let Some(old) = self.commands.get(&name) {
+                    cmd.overwrote_definition_in = Some(old.source_location.clone());
                 }
-            } else {
-                printer.trace(&format!(
-                    "Not considering {p:?} as command: Not a toml file"
-                ));
+
+                self.commands.insert(name, cmd);
             }
         }
         Ok(())
@@ -203,27 +213,6 @@ impl CommandManager {
 
     pub fn is_empty(&self) -> bool {
         self.commands.is_empty()
-    }
-
-    pub fn alias(&mut self, from: &str, to: &str) -> anyhow::Result<()> {
-        let Some(from_cmd) = self.commands.get(from) else {
-            return Err(anyhow!("Can not find {from} to alias"));
-        };
-        if !from_cmd.can_alias {
-            return Err(anyhow!("I may not alias {from}. Check the command definition or maybe it was loaded from a user directory?"));
-        }
-
-        validate_command_name(to).context(format!("{to} is not a valid name to alias to"))?;
-        let aliased_command = Command {
-            script: format!("{from} \"${{@}}\""),
-            can_alias: false,
-            help: Some(format!("Alias of {from}")),
-            inputs: Vec::new(),
-        };
-
-        self.commands.insert(to.to_string(), aliased_command);
-
-        Ok(())
     }
 
     pub fn list_commands(&self, verbose: bool) -> String {

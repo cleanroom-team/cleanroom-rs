@@ -1,0 +1,10 @@
+[command]
+help = """
+Install packages using moss (serpentos)
+"""
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_INSTALL}" ]; then
+        error "moss is not supported yet!"
+    fi
+"""

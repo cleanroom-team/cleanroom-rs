@@ -114,22 +114,11 @@ impl ContextMap {
 
 #[derive(Debug)]
 pub struct ContextBuilder {
-    commands: crate::commands::CommandManagerBuilder,
-    printer: crate::printer::Printer,
     timestamp: String,
     version: Option<String>,
 }
 
 impl ContextBuilder {
-    pub fn new(printer: crate::printer::Printer) -> Self {
-        Self {
-            commands: crate::commands::CommandManagerBuilder::default(),
-            printer,
-            timestamp: format!("{}", chrono::Utc::now().format("%Y%m%d%H%M%S")),
-            version: None,
-        }
-    }
-
     pub fn timestamp(mut self, timestamp: String) -> anyhow::Result<Self> {
         let timestamp = timestamp.trim();
 
@@ -160,8 +149,6 @@ impl ContextBuilder {
         };
 
         Context {
-            commands: self.commands,
-            printer: Rc::new(self.printer),
             variables: ContextMap(BTreeMap::from([
                 (
                     OsString::from(TIMESTAMP),
@@ -184,10 +171,17 @@ impl ContextBuilder {
     }
 }
 
+impl Default for ContextBuilder {
+    fn default() -> Self {
+        Self {
+            timestamp: format!("{}", chrono::Utc::now().format("%Y%m%d%H%M%S")),
+            version: None,
+        }
+    }
+}
+
 #[derive(Clone, Debug)]
 pub struct Context {
-    commands: crate::commands::CommandManagerBuilder,
-    printer: Rc<crate::printer::Printer>,
     variables: ContextMap,
 }
 
@@ -210,10 +204,15 @@ const WORK_DIR: &str = "WORK_DIR";
 
 impl Context {
     #[cfg(test)]
-    pub fn test_system(&self) -> RunContext {
+    pub fn test_system(&self, log_level: LogLevel) -> RunContext {
+        use crate::printer::LogLevel;
+
+        let printer = Printer::new(log_level);
+        let commands = self.command_manager_builder().build();
+
         let mut ctx = RunContext {
-            commands: self.commands.build(),
-            printer: self.printer.clone(),
+            commands,
+            printer,
             variables: self.variables.clone(),
             bootstrap_environment: crate::RunEnvironment::Directory(PathBuf::from(
                 "/tmp/bootstrap_dir",
@@ -232,17 +231,12 @@ impl Context {
         ctx
     }
 
-    pub fn printer(&self) -> Rc<crate::printer::Printer> {
-        self.printer.clone()
-    }
-
-    pub fn command_manager_builder(&mut self) -> &mut crate::commands::CommandManagerBuilder {
-        &mut self.commands
-    }
-
     // Setter:
-    pub fn set_system(
+    #[allow(clippy::too_many_arguments)]
+    pub fn create_run_context(
         &self,
+        commands: crate::commands::CommandManager,
+        printer: Rc<crate::printer::Printer>,
         work_directory: &Path,
         artifact_directory: &Path,
         busybox_binary: &Path,
@@ -277,8 +271,8 @@ impl Context {
         }
 
         let mut ctx = RunContext {
-            commands: self.commands.build(),
-            printer: self.printer.clone(),
+            commands,
+            printer,
             variables: self.variables.clone(),
             bootstrap_environment,
         };

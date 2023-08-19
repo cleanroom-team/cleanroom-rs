@@ -50,14 +50,6 @@ fn parse_stdout(m: &str, command_prefix: &str, ctx: &mut RunContext) -> bool {
     } else if let Some(status) = cmd.strip_prefix("STATUS ") {
         let status = status.trim().trim_matches('"');
         ctx.printer().h3(status, true);
-    } else if let Some(to_alias) = cmd.strip_prefix("ALIAS ") {
-        if let Some((k, v)) = to_alias.split_once('=') {
-            let k = k.trim().trim_matches('"');
-            let v = v.trim().trim_matches('"');
-            if let Err(e) = ctx.command_manager_mut().alias(k, v) {
-                p.error(&format!("Failed to ALIAS: {e}"));
-            }
-        }
     } else {
         p.error(&format!("Agent asked to process unknown command {cmd:?}"))
     }
@@ -69,75 +61,96 @@ fn run_in_bootstrap(phase: &Phases) -> bool {
 }
 
 #[allow(clippy::needless_pass_by_ref_mut)] // FIXME: It's not useless: It's passed on to parse_stdout!
-pub async fn run_agent(ctx: &mut RunContext, command: &str) -> anyhow::Result<()> {
+pub async fn run_agent_phase(
+    ctx: &mut RunContext,
+    command: &str,
+    phase: &Phases,
+    enter_phase: &Option<Phases>,
+) -> anyhow::Result<()> {
+    let p = ctx.printer();
+    p.debug(&format!("Entering {phase} with {ctx}"));
+    let agent_script =
+        crate::scripts::create_script(ctx, command).context("Failed to create agent script")?;
+
+    p.h2("Run in container", true);
+    let runner = {
+        let runner = if run_in_bootstrap(phase) {
+            Nspawn::default_runner(ctx.bootstrap_environment().clone())?
+                // .binding(Binding::tmpfs(&PathBuf::from("/tmp")))
+                .binding(Binding::rw(
+                    &ctx.root_directory().unwrap(),
+                    &PathBuf::from("/tmp/clrm/root_fs"),
+                ))
+                .env("CLRM_CONTAINER", "bootstrap")
+                .env("ROOT_FS", "/tmp/clrm/root_fs")
+        } else {
+            Nspawn::default_runner(RunEnvironment::Directory(
+                ctx.root_directory().unwrap().clone(),
+            ))?
+            // .binding(Binding::tmpfs(&PathBuf::from("/tmp")))
+            .env("CLRM_CONTAINER", "root_fs")
+            .env("ROOT_FS", "/")
+        };
+
+        runner
+            .machine_id(DEFAULT_MACHINE_ID)
+            .binding(Binding::ro(
+                &ctx.my_binary().unwrap(),
+                &PathBuf::from("/tmp/clrm/agent"),
+            ))
+            .binding(Binding::ro(
+                &ctx.busybox_binary().unwrap(),
+                &PathBuf::from("/tmp/clrm/busybox"),
+            ))
+            .binding(Binding::ro(
+                &agent_script,
+                &PathBuf::from("/tmp/clrm/script.sh"),
+            ))
+    };
+
+    let command_prefix = uuid::Uuid::new_v4().to_string();
+    let command = if Some(phase) == enter_phase.as_ref() {
+        let mut command = Command::new("/tmp/clrm/busybox");
+        command.arg("sh");
+        command
+    } else {
+        let mut command = Command::new("/tmp/clrm/agent");
+        command.arg("agent");
+        command.arg(&format!("--command-prefix={command_prefix}"));
+        command.arg(&phase.to_string());
+        command
+    };
+
+    let command_prefix = format!("{command_prefix}: ");
+    runner
+        .run(
+            &command,
+            &|m| p.trace(m),
+            &|m| p.error(m),
+            &mut |m| {
+                if !parse_stdout(m, &command_prefix, ctx) {
+                    p.print_stdout(m);
+                }
+            },
+            &mut |m| p.print_stderr(m),
+        )
+        .await
+        .context("Failed to containerize")?;
+
+    Ok(())
+}
+
+#[allow(clippy::needless_pass_by_ref_mut)] // FIXME: It's not useless: It's passed on to run_agent_phase
+pub async fn run_agent(
+    ctx: &mut RunContext,
+    command: &str,
+    enter_phase: &Option<Phases>,
+) -> anyhow::Result<()> {
     let p = ctx.printer();
     p.h1("Run Agent", true);
 
-    for phase in crate::Phases::iter() {
-        p.debug(&format!("Entering {phase} with {ctx}"));
-        let agent_script =
-            crate::scripts::create_script(ctx, command).context("Failed to create agent script")?;
-
-        p.h2("Run in container", true);
-        let runner = {
-            let runner = if run_in_bootstrap(phase) {
-                Nspawn::default_runner(ctx.bootstrap_environment().clone())?
-                    // .binding(Binding::tmpfs(&PathBuf::from("/tmp")))
-                    .binding(Binding::rw(
-                        &ctx.root_directory().unwrap(),
-                        &PathBuf::from("/tmp/clrm/root_fs"),
-                    ))
-                    .env("CLRM_CONTAINER", "bootstrap")
-                    .env("ROOT_FS", "/tmp/clrm/root_fs")
-            } else {
-                Nspawn::default_runner(RunEnvironment::Directory(
-                    ctx.root_directory().unwrap().clone(),
-                ))?
-                // .binding(Binding::tmpfs(&PathBuf::from("/tmp")))
-                .env("CLRM_CONTAINER", "root_fs")
-                .env("ROOT_FS", "/")
-            };
-
-            runner
-                .machine_id(DEFAULT_MACHINE_ID)
-                .binding(Binding::ro(
-                    &ctx.my_binary().unwrap(),
-                    &PathBuf::from("/tmp/clrm/agent"),
-                ))
-                .binding(Binding::ro(
-                    &ctx.busybox_binary().unwrap(),
-                    &PathBuf::from("/tmp/clrm/busybox"),
-                ))
-                .binding(Binding::ro(
-                    &agent_script,
-                    &PathBuf::from("/tmp/clrm/script.sh"),
-                ))
-        };
-
-        let command_prefix = uuid::Uuid::new_v4().to_string();
-        let command = {
-            let mut command = Command::new("/tmp/clrm/agent");
-            command.arg("agent");
-            command.arg(&format!("--command-prefix={command_prefix}"));
-            command.arg(&phase.to_string());
-            command
-        };
-
-        let command_prefix = format!("{command_prefix}: ");
-        runner
-            .run(
-                &command,
-                &|m| p.trace(m),
-                &|m| p.error(m),
-                &mut |m| {
-                    if !parse_stdout(m, &command_prefix, ctx) {
-                        p.print_stdout(m);
-                    }
-                },
-                &mut |m| p.print_stderr(m),
-            )
-            .await
-            .context("Failed to containerize")?;
+    for phase in Phases::iter() {
+        run_agent_phase(ctx, command, phase, enter_phase).await?;
     }
 
     Ok(())

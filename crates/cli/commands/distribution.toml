@@ -16,10 +16,24 @@ script = """
 
         if [ "${distribution_id}" == "arch" ]; then
             _distribution_arch
+        elif [ "${distribution_id}" == "serpentos" ]; then
+            _distribution_serpentos
         else
            error "Unknown base distribution id ${distribution_id} provided"
         fi
 
         export_constant CLRM_BASE_DISTRIBUTION "${distribution_id}"
+
+        export_var PACKAGES ""
+    elif [ "${CURRENT_PHASE}" = "${PHASE_INSTALL}" ]; then
+        export_constant PACKAGES "${PACKAGES}" # Make PACKAGES ro from here on out!
+
+        if [ "${distribution_id}" == "arch" ]; then
+            _pacstrap
+        elif [ "${distribution_id}" == "serpentos" ]; then
+            _moss
+        else
+           error "Unknown base distribution id ${distribution_id} provided"
+        fi
     fi
 """
