@@ -28,6 +28,7 @@ pub trait Runtime {
         &self,
         container_data: &ContainerData,
         command: &crate::Command,
+        pipe_io: bool,
     ) -> crate::Result<(tokio::process::Child, PathBuf, Vec<OsString>)>;
 }
 
@@ -190,6 +191,7 @@ impl Runtime for Nspawn {
         &self,
         container_data: &ContainerData,
         command: &crate::Command,
+        pipe_io: bool,
     ) -> crate::Result<(tokio::process::Child, PathBuf, Vec<OsString>)> {
         self.validate()?;
         self.prepare()?;
@@ -211,7 +213,7 @@ impl Runtime for Nspawn {
             OsString::from("--resolv-conf=off"),
             OsString::from("--timezone=off"),
             OsString::from("--link-journal=no"),
-            OsString::from("--console=pipe"),
+            // OsString::from("--console=pipe"),
         ]);
 
         if let Some(machine_id) = container_data.machine_id {
@@ -258,17 +260,21 @@ impl Runtime for Nspawn {
         args.push(command.command.as_os_str().to_os_string());
         args.append(&mut command.arguments.clone());
 
-        Ok((
-            tokio::process::Command::new(executable.clone())
-                .args(args.clone())
-                .env_clear()
+        let mut command = tokio::process::Command::new(executable.clone());
+        command.args(args.clone()).env_clear();
+        if pipe_io {
+            command
                 .stdin(std::process::Stdio::piped())
                 .stdout(std::process::Stdio::piped())
-                .stderr(std::process::Stdio::piped())
-                .spawn()?,
-            PathBuf::from(executable),
-            args,
-        ))
+                .stderr(std::process::Stdio::piped());
+        } else {
+            command
+                .stdin(std::process::Stdio::inherit())
+                .stdout(std::process::Stdio::inherit())
+                .stderr(std::process::Stdio::inherit());
+        }
+
+        Ok((command.spawn()?, PathBuf::from(executable), args))
     }
 }
 
@@ -375,8 +381,9 @@ impl<RT: Clone + std::fmt::Debug + Runtime> Runner<RT> {
     pub fn run_raw(
         &self,
         command: &crate::Command,
+        pipe_io: bool,
     ) -> crate::Result<(tokio::process::Child, PathBuf, Vec<OsString>)> {
-        self.runtime.run(&self.container_data, command)
+        self.runtime.run(&self.container_data, command, pipe_io)
     }
 
     /// Run a `Command`, process output and report result
@@ -396,7 +403,7 @@ impl<RT: Clone + std::fmt::Debug + Runtime> Runner<RT> {
         stdout: &mut dyn FnMut(&'_ str),
         stderr: &mut dyn FnMut(&'_ str),
     ) -> crate::Result<()> {
-        let (mut child, executable, args) = self.run_raw(command)?;
+        let (mut child, executable, args) = self.run_raw(command, true)?;
         trace(&format!(
             "Running {executable:?} {} ...",
             args.join(&OsString::from(" ")).to_string_lossy()

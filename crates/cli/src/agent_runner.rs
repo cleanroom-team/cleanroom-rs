@@ -4,9 +4,9 @@
 use crate::{context::RunContext, Phases};
 
 use anyhow::Context;
-use contained_command::{Binding, Command, Nspawn, RunEnvironment};
+use contained_command::{Binding, Command, Nspawn, RunEnvironment, Runner};
 
-use std::path::PathBuf;
+use std::{ffi::OsString, path::PathBuf};
 
 // - Constants:
 // ----------------------------------------------------------------------
@@ -60,60 +60,97 @@ fn run_in_bootstrap(phase: &Phases) -> bool {
     phase == &Phases::Install || phase == &Phases::BuildArtifacts || phase == &Phases::TestArtifacts
 }
 
+fn create_runner(
+    ctx: &RunContext,
+    command: &str,
+    phase: &Phases,
+) -> anyhow::Result<Runner<contained_command::Nspawn>> {
+    let agent_script =
+        crate::scripts::create_script(ctx, command).context("Failed to create agent script")?;
+
+    let runner = if run_in_bootstrap(phase) {
+        Nspawn::default_runner(ctx.bootstrap_environment().clone())?
+            // .binding(Binding::tmpfs(&PathBuf::from("/tmp")))
+            .binding(Binding::rw(
+                &ctx.root_directory().unwrap(),
+                &PathBuf::from("/tmp/clrm/root_fs"),
+            ))
+            .env("CLRM_CONTAINER", "bootstrap")
+            .env("ROOT_FS", "/tmp/clrm/root_fs")
+    } else {
+        Nspawn::default_runner(RunEnvironment::Directory(
+            ctx.root_directory().unwrap().clone(),
+        ))?
+        // .binding(Binding::tmpfs(&PathBuf::from("/tmp")))
+        .env("CLRM_CONTAINER", "root_fs")
+        .env("ROOT_FS", "/")
+    };
+
+    Ok(runner
+        .machine_id(DEFAULT_MACHINE_ID)
+        .binding(Binding::ro(
+            &ctx.my_binary().unwrap(),
+            &PathBuf::from("/tmp/clrm/agent"),
+        ))
+        .binding(Binding::ro(
+            &ctx.busybox_binary().unwrap(),
+            &PathBuf::from("/tmp/clrm/busybox"),
+        ))
+        .binding(Binding::ro(
+            &agent_script,
+            &PathBuf::from("/tmp/clrm/script.sh"),
+        )))
+}
+
+#[allow(clippy::needless_pass_by_ref_mut)] // FIXME: It's not useless: It's passed on to parse_stdout!
+pub async fn enter_agent_phase(
+    ctx: &mut RunContext,
+    command: &str,
+    phase: &Phases,
+) -> anyhow::Result<()> {
+    let p = ctx.printer();
+    p.debug(&format!("Entering container in {phase} with {ctx}"));
+    p.h2("Enter container", true);
+    let runner = create_runner(ctx, command, phase)?;
+
+    let command = {
+        let mut command = Command::new("/tmp/clrm/busybox");
+        command.arg("sh");
+        command.env("CURRENT_PHASE", phase.to_string());
+        command
+    };
+
+    let (mut child, command_path, args) = runner
+        .run_raw(&command, false)
+        .context("Failed to containerize")?;
+
+    println!(
+        "\nRunning: {command_path:?} {}",
+        args.join(&OsString::from(" ")).to_string_lossy()
+    );
+
+    let result = child.wait().await?;
+
+    if result.success() {
+        Ok(())
+    } else {
+        Err(anyhow::anyhow!("Container was not terminated successfully"))
+    }
+}
+
 #[allow(clippy::needless_pass_by_ref_mut)] // FIXME: It's not useless: It's passed on to parse_stdout!
 pub async fn run_agent_phase(
     ctx: &mut RunContext,
     command: &str,
     phase: &Phases,
-    enter_phase: &Option<Phases>,
 ) -> anyhow::Result<()> {
     let p = ctx.printer();
-    p.debug(&format!("Entering {phase} with {ctx}"));
-    let agent_script =
-        crate::scripts::create_script(ctx, command).context("Failed to create agent script")?;
-
+    p.debug(&format!("Automatically running {phase} with {ctx}"));
     p.h2("Run in container", true);
-    let runner = {
-        let runner = if run_in_bootstrap(phase) {
-            Nspawn::default_runner(ctx.bootstrap_environment().clone())?
-                // .binding(Binding::tmpfs(&PathBuf::from("/tmp")))
-                .binding(Binding::rw(
-                    &ctx.root_directory().unwrap(),
-                    &PathBuf::from("/tmp/clrm/root_fs"),
-                ))
-                .env("CLRM_CONTAINER", "bootstrap")
-                .env("ROOT_FS", "/tmp/clrm/root_fs")
-        } else {
-            Nspawn::default_runner(RunEnvironment::Directory(
-                ctx.root_directory().unwrap().clone(),
-            ))?
-            // .binding(Binding::tmpfs(&PathBuf::from("/tmp")))
-            .env("CLRM_CONTAINER", "root_fs")
-            .env("ROOT_FS", "/")
-        };
-
-        runner
-            .machine_id(DEFAULT_MACHINE_ID)
-            .binding(Binding::ro(
-                &ctx.my_binary().unwrap(),
-                &PathBuf::from("/tmp/clrm/agent"),
-            ))
-            .binding(Binding::ro(
-                &ctx.busybox_binary().unwrap(),
-                &PathBuf::from("/tmp/clrm/busybox"),
-            ))
-            .binding(Binding::ro(
-                &agent_script,
-                &PathBuf::from("/tmp/clrm/script.sh"),
-            ))
-    };
+    let runner = create_runner(ctx, command, phase)?;
 
     let command_prefix = uuid::Uuid::new_v4().to_string();
-    let command = if Some(phase) == enter_phase.as_ref() {
-        let mut command = Command::new("/tmp/clrm/busybox");
-        command.arg("sh");
-        command
-    } else {
+    let command = {
         let mut command = Command::new("/tmp/clrm/agent");
         command.arg("agent");
         command.arg(&format!("--command-prefix={command_prefix}"));
@@ -150,7 +187,11 @@ pub async fn run_agent(
     p.h1("Run Agent", true);
 
     for phase in Phases::iter() {
-        run_agent_phase(ctx, command, phase, enter_phase).await?;
+        if enter_phase.as_ref() == Some(phase) {
+            return enter_agent_phase(ctx, command, phase).await;
+        } else {
+            run_agent_phase(ctx, command, phase).await?;
+        }
     }
 
     Ok(())

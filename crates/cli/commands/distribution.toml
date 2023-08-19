@@ -2,7 +2,7 @@
 inputs = [{ name = "distribution_id", help = "The base distribution id" }]
 help = """
 Set the base distribution to use for cleanroom.
-\t\t\t\tPossible values are \"arch\".
+\t\t\tPossible values are "arch" and "serpentos".
 """
 
 script = """

@@ -221,13 +221,13 @@ impl CommandManager {
 
         if verbose {
             self.commands.iter().for_each(|(name, command)| {
-                result += &format!("    {name}:\n");
-                result += &format!("      {command}");
+                result += &format!("{name}:\n");
+                result += &format!("{command}");
             });
         } else {
             self.commands.iter().for_each(|(name, command)| {
                 let help: &str = command.help.as_ref().unwrap_or(&default_value);
-                result += &format!("    {name}:\t{help}\n");
+                result += &format!("  {name}:\t{help}\n");
             });
         }
 
