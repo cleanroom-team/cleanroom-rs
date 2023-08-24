@@ -1,0 +1,22 @@
+[command]
+help = """
+Polish away pacman artifacts if pacman is not installed
+"""
+
+script = """
+    pacman_dir=/usr/lib/pacman
+    cache_dir=/var/lib/pacman
+
+    if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
+        if [ -x /usr/bin/pacman ]; then
+            echo "Pacman is installed: Keep pacman metadata"
+            rm -rf /var/lib/pacman/*
+        else
+            echo "Pacman is *NOT* installed: Purge pacman files"
+            rm -rf /etc/pacman.conf /etc/pacman.d \
+               /usr/lib/pacman \
+               /var/lib/pacman \
+               /var/cache
+        fi
+    fi
+"""

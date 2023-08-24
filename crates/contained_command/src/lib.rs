@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 // Copyright (C) 2020 Tobias Hunger <tobias.hunger@gmail.com>
 
+// cSpell: ignore peekable
+
 //! Functionality related to running a command in a container
 
 // Setup warnings/errors:
@@ -57,6 +59,9 @@ pub enum Error {
     /// Run environment validation failed
     #[error("Run environment validation failed: {0}")]
     RunEnvironment(String),
+    /// Run environment validation failed
+    #[error("Failed to parse {0} into a binding")]
+    BindingParseFailed(String),
 }
 
 /// `contained_command` `Result` type
@@ -100,7 +105,7 @@ pub enum Binding {
 impl Binding {
     /// Create a new `RW` `Binding`
     #[must_use]
-    pub fn rw(source: &impl AsRef<Path>, target: &impl AsRef<Path>) -> Self {
+    pub fn rw(source: &(impl AsRef<Path> + ?Sized), target: &(impl AsRef<Path> + ?Sized)) -> Self {
         Self::RW(BindMap {
             source: source.as_ref().to_path_buf(),
             target: target.as_ref().to_path_buf(),
@@ -109,7 +114,7 @@ impl Binding {
 
     /// Create a new `RO` `Binding`
     #[must_use]
-    pub fn ro(source: &impl AsRef<Path>, target: &impl AsRef<Path>) -> Self {
+    pub fn ro(source: &(impl AsRef<Path> + ?Sized), target: &(impl AsRef<Path> + ?Sized)) -> Self {
         Self::RO(BindMap {
             source: source.as_ref().to_path_buf(),
             target: target.as_ref().to_path_buf(),
@@ -118,19 +123,22 @@ impl Binding {
 
     /// Create a new `TmpFS` `Binding`
     #[must_use]
-    pub fn tmpfs(target: &impl AsRef<Path>) -> Self {
+    pub fn tmpfs(target: &(impl AsRef<Path> + ?Sized)) -> Self {
         Self::TmpFS(target.as_ref().to_path_buf())
     }
 
     /// Create a new `Inaccessible` `Binding`
     #[must_use]
-    pub fn inaccessible(target: &impl AsRef<Path>) -> Self {
+    pub fn inaccessible(target: &(impl AsRef<Path> + ?Sized)) -> Self {
         Self::Inaccessible(target.as_ref().to_path_buf())
     }
 
     /// Create a new `Overlay` `Binding`
     #[must_use]
-    pub fn overlay(sources: &[&impl AsRef<Path>], target: &impl AsRef<Path>) -> Self {
+    pub fn overlay(
+        sources: &[&(impl AsRef<Path> + ?Sized)],
+        target: &(impl AsRef<Path> + ?Sized),
+    ) -> Self {
         Self::Overlay(OverlayMap {
             sources: sources.iter().map(|p| p.as_ref().to_path_buf()).collect(),
             target: target.as_ref().to_path_buf(),
@@ -139,11 +147,90 @@ impl Binding {
 
     /// Create a new `OverlayRO` `Binding`
     #[must_use]
-    pub fn overlay_ro(sources: &[&impl AsRef<Path>], target: &impl AsRef<Path>) -> Self {
+    pub fn overlay_ro(
+        sources: &[&(impl AsRef<Path> + ?Sized)],
+        target: &(impl AsRef<Path> + ?Sized),
+    ) -> Self {
         Self::Overlay(OverlayMap {
             sources: sources.iter().map(|p| p.as_ref().to_path_buf()).collect(),
             target: target.as_ref().to_path_buf(),
         })
+    }
+}
+
+impl TryFrom<&str> for Binding {
+    type Error = crate::Error;
+
+    fn try_from(value: &str) -> std::result::Result<Self, Self::Error> {
+        let error = || Err(Self::Error::BindingParseFailed(value.to_string()));
+
+        let mut parts = value.split(':').peekable();
+
+        let kind = parts.next();
+
+        match kind {
+            Some("rw") => {
+                let Some(from) = parts.next() else {
+                    return error();
+                };
+                let Some(to) = parts.next() else {
+                    return error();
+                };
+                if parts.next().is_some() {
+                    return error();
+                }
+                Ok(Self::rw(from, to))
+            }
+            Some("ro") => {
+                let Some(from) = parts.next() else {
+                    return error();
+                };
+                let Some(to) = parts.next() else {
+                    return error();
+                };
+                if parts.next().is_some() {
+                    return error();
+                }
+                Ok(Self::ro(from, to))
+            }
+            Some("tmpfs") => {
+                let Some(from) = parts.next() else {
+                    return error();
+                };
+                if parts.next().is_some() {
+                    return error();
+                }
+                Ok(Self::tmpfs(from))
+            }
+            Some("inaccessible") => {
+                let Some(from) = parts.next() else {
+                    return error();
+                };
+                if parts.next().is_some() {
+                    return error();
+                }
+                Ok(Self::inaccessible(from))
+            }
+            Some("overlay") => {
+                let args = parts.collect::<Vec<_>>();
+                let len = args.len();
+                if len >= 2 {
+                    Ok(Self::overlay(&args[..len - 1], &args[len - 1]))
+                } else {
+                    error()
+                }
+            }
+            Some("overlay_ro") => {
+                let args = parts.collect::<Vec<_>>();
+                let len = args.len();
+                if len >= 2 {
+                    Ok(Self::overlay_ro(&args[..len - 1], &args[len - 1]))
+                } else {
+                    error()
+                }
+            }
+            _ => error(),
+        }
     }
 }
 

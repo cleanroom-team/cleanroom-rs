@@ -1,0 +1,12 @@
+[command]
+help = """
+Purge documentation from the system.
+"""
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
+        rm -rf /usr/share/doc/* \
+            /usr/share/gtk-doc/html/* \
+            /usr/share/help/*
+    fi
+"""

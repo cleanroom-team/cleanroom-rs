@@ -1,0 +1,15 @@
+[command]
+help = """
+Polish away man pages if man is not installed
+"""
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
+        if [ -x /usr/bin/man ]; then
+            echo "man is installed: Keep manpages"
+        else
+            echo "man is *NOT* installed: Purging manpages"
+            rm -rf /usr/share/man
+        fi
+    fi
+"""

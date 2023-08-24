@@ -1,0 +1,10 @@
+[command]
+help = """
+Polish away legal documents like license headers, etc.
+"""
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
+        rm -rf /usr/share/licenses/*
+    fi
+"""

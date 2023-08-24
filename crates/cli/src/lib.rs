@@ -6,11 +6,19 @@ use clap::ValueEnum;
 #[derive(Debug, Clone, Eq, PartialEq, clap::ValueEnum)]
 #[clap(rename_all = "snake_case")]
 pub enum Phases {
+    /// Prepare for install: Set up package manager and other basic things
     Prepare,
+    /// Run package installs in bootstrap environment
     Install,
+    /// Polish the new installation: Add and remove files
     Polish,
+    /// Do post install steps like updating the various DBs and such
+    PostInstall,
+    /// Test the image that is about to be generated
     Test,
+    /// Build artifacts from the image in bootstrap environment
     BuildArtifacts,
+    /// Test the generated artifacts in the bootstrap environment
     TestArtifacts,
 }
 

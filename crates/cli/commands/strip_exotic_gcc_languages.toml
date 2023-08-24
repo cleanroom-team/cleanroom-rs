@@ -1,0 +1,12 @@
+[command]
+help = """
+Strip out exotig GCC languages (fortran, D and go)
+"""
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
+        rm -rf /usr/lib/libgfortran.so* \
+            /usr/lib/libgo.so* \
+            /usr/lib/libgphobos.so*
+    fi
+"""

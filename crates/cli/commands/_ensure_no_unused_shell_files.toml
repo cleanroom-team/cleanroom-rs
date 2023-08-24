@@ -1,0 +1,29 @@
+[command]
+help = """
+Polish away any shell config files for shells that are not installed
+"""
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
+        if [ -x /usr/bin/zsh ]; then
+            echo "zsh is installed: Keep /usr/share/zsh"
+        else
+            echo "zsh is *NOT* installed: Purge /usr/share/zsh"
+            rm -rf /usr/share/zsh
+        fi
+
+        if [ -x /usr/bin/fish ]; then
+            echo "fish is installed: Keep /usr/share/fish"
+        else
+            echo "fish is *NOT* installed: Purge /usr/share/fish"
+            rm -rf /usr/share/fish
+        fi
+
+        if [ -x /usr/bin/bash ]; then
+            echo "bash is installed: Keep /usr/share/bash-completion"
+        else
+            echo "bash is *NOT* installed: Purge /usr/share/bash-completion"
+            rm -rf /usr/share/bash-completion
+        fi
+    fi
+"""

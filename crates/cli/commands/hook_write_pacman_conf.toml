@@ -1,0 +1,38 @@
+[command]
+help = """
+Install packages for arch linux distributions
+"""
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_PREPARE}" ]; then
+        cat <<"EOF" > /etc/pacman.conf
+[options]
+DBPath = /usr/lib/pacman/db/
+GPGDir = /usr/lib/pacman/gpg/
+HoldPkg = pacman glibc
+Architecture = x86_64
+
+SigLevel = Required DatabaseOptional
+LocalFileSigLevel = Optional
+
+[custom]
+SigLevel = Optional TrustAll
+Server = file:///tmp/clrm/pkgs/fritz.box/$repo/os/$arch
+
+[testing]
+Server = file:///tmp/clrm/pkgs/archlinux.org/$repo/os/$arch
+
+[core]
+Server = file:///tmp/clrm/pkgs/archlinux.org/$repo/os/$arch
+
+[extra]
+Server = file:///tmp/clrm/pkgs/archlinux.org/$repo/os/$arch
+
+[community-testing]
+Server = file:///tmp/clrm/pkgs/archlinux.org/$repo/os/$arch
+
+[community]
+Server = file:///tmp/clrm/pkgs/archlinux.org/$repo/os/$arch
+EOF
+    fi
+"""

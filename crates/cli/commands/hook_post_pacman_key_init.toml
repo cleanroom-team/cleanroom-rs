@@ -1,0 +1,10 @@
+[command]
+help = """
+A Hook run right after pacman_keyinit was run
+"""
+inputs = [{ name = "gpg_dir", help = "Pacman gpg directory" }]
+
+script = """
+    # This is the default action: Feel free to override/amend
+    /usr/bin/pacman-key --populate archlinux --gpgdir "${gpg_dir}"
+"""

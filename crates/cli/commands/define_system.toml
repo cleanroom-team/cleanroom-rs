@@ -1,0 +1,36 @@
+[command]
+help = """
+Define a system
+"""
+inputs = [
+    { name = "distribution", help = "The base distribution to use" },
+    { name = "host_name", help = "The name of the system" },
+    { name = "pretty_name", help = "The pretty, user-visible name of the system" },
+    { name = "machine_id", help = "The machine-id of the machine" },
+    { name = "chassis", help = "The kind of chassis this computer is built into. Defaults to `desktop`" },
+]
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_PREPARE}" ]; then
+	    if [ -n "${CLRM_BASE_DISTRIBUTION}" ]; then
+		    error "Distribution already initialized."
+	    fi
+
+        export_constant HOST_NAME "${host_name}"
+        export_constant PRETTY_HOST_NAME "${pretty_name}"
+    fi
+
+    _distribution "${distribution}"
+
+
+    if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
+        cat <<EOF > /etc/machine.info
+PRETTY_HOSTNAME="${pretty_name}"
+CHASSIS="${chassis-desktop}"
+DEPLOYMENT="production"
+EOF
+
+        echo "${host_name}" > /etc/hostname
+        echo "${machine_id}" > /etc/machine-id
+    fi
+"""

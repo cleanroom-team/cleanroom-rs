@@ -64,11 +64,17 @@ fn create_runner(
     ctx: &RunContext,
     command: &str,
     phase: &Phases,
+    extra_bindings: &[String],
 ) -> anyhow::Result<Runner<contained_command::Nspawn>> {
+    let p = ctx.printer();
+
+    p.h2(&format!("Create \"{phase}\""), true);
     let agent_script =
         crate::scripts::create_script(ctx, command).context("Failed to create agent script")?;
 
-    let runner = if run_in_bootstrap(phase) {
+    let mut runner = if run_in_bootstrap(phase) {
+        p.debug(&format!("Running \"{phase}\" [BOOTSTRAP]"));
+        p.h2(&format!("Run \"{phase}\" [BOOTSTRAP]"), true);
         Nspawn::default_runner(ctx.bootstrap_environment().clone())?
             // .binding(Binding::tmpfs(&PathBuf::from("/tmp")))
             .binding(Binding::rw(
@@ -78,16 +84,20 @@ fn create_runner(
             .env("CLRM_CONTAINER", "bootstrap")
             .env("ROOT_FS", "/tmp/clrm/root_fs")
     } else {
+        p.debug(&format!("Running \"{phase}\" [ROOT]"));
+        p.h2(&format!("Run \"{phase}\" [ROOT]"), true);
         Nspawn::default_runner(RunEnvironment::Directory(
             ctx.root_directory().unwrap().clone(),
         ))?
         // .binding(Binding::tmpfs(&PathBuf::from("/tmp")))
         .env("CLRM_CONTAINER", "root_fs")
         .env("ROOT_FS", "/")
+        .persistent_root()
     };
 
-    Ok(runner
+    runner = runner
         .machine_id(DEFAULT_MACHINE_ID)
+        .share_users()
         .binding(Binding::ro(
             &ctx.my_binary().unwrap(),
             &PathBuf::from("/tmp/clrm/agent"),
@@ -99,7 +109,15 @@ fn create_runner(
         .binding(Binding::ro(
             &agent_script,
             &PathBuf::from("/tmp/clrm/script.sh"),
-        )))
+        ));
+
+    for extra in extra_bindings {
+        let binding =
+            Binding::try_from(extra.as_str()).context("Failed to apply extra arguments")?;
+        runner = runner.binding(binding);
+    }
+
+    Ok(runner)
 }
 
 #[allow(clippy::needless_pass_by_ref_mut)] // FIXME: It's not useless: It's passed on to parse_stdout!
@@ -107,11 +125,12 @@ pub async fn enter_agent_phase(
     ctx: &mut RunContext,
     command: &str,
     phase: &Phases,
+    extra_bindings: &[String],
 ) -> anyhow::Result<()> {
     let p = ctx.printer();
     p.debug(&format!("Entering container in {phase} with {ctx}"));
     p.h2("Enter container", true);
-    let runner = create_runner(ctx, command, phase)?;
+    let runner = create_runner(ctx, command, phase, extra_bindings)?.with_network();
 
     let command = {
         let mut command = Command::new("/tmp/clrm/busybox");
@@ -143,11 +162,12 @@ pub async fn run_agent_phase(
     ctx: &mut RunContext,
     command: &str,
     phase: &Phases,
+    extra_bindings: &[String],
 ) -> anyhow::Result<()> {
     let p = ctx.printer();
     p.debug(&format!("Automatically running {phase} with {ctx}"));
     p.h2("Run in container", true);
-    let runner = create_runner(ctx, command, phase)?;
+    let runner = create_runner(ctx, command, phase, extra_bindings)?;
 
     let command_prefix = uuid::Uuid::new_v4().to_string();
     let command = {
@@ -182,15 +202,16 @@ pub async fn run_agent(
     ctx: &mut RunContext,
     command: &str,
     enter_phase: &Option<Phases>,
+    extra_bindings: &[String],
 ) -> anyhow::Result<()> {
     let p = ctx.printer();
     p.h1("Run Agent", true);
 
     for phase in Phases::iter() {
         if enter_phase.as_ref() == Some(phase) {
-            return enter_agent_phase(ctx, command, phase).await;
+            return enter_agent_phase(ctx, command, phase, extra_bindings).await;
         } else {
-            run_agent_phase(ctx, command, phase).await?;
+            run_agent_phase(ctx, command, phase, extra_bindings).await?;
         }
     }
 

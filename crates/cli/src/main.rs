@@ -60,6 +60,10 @@ struct RunMode {
     bootstrap_directory: Option<PathBuf>,
 
     /// Enter a debug environment in the provided phase
+    #[arg(long = "extra-binding")]
+    extra_bindings: Vec<String>,
+
+    /// Enter a debug environment in the provided phase
     #[arg(long = "enter-phase")]
     enter_phase: Option<cli::Phases>,
 
@@ -166,9 +170,14 @@ async fn main() -> anyhow::Result<()> {
 
             let printer = ctx.printer();
             printer.h1("Run agent", true);
-            cli::agent_runner::run_agent(&mut ctx, &run.command, &run.enter_phase)
-                .await
-                .context("Failed to drive agent")?;
+            cli::agent_runner::run_agent(
+                &mut ctx,
+                &run.command,
+                &run.enter_phase,
+                &run.extra_bindings,
+            )
+            .await
+            .context("Failed to drive agent")?;
             Ok(())
         }
     }

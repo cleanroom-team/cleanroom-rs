@@ -207,13 +207,10 @@ impl Runtime for Nspawn {
 
         args.extend_from_slice(&[
             OsString::from("--quiet"),
-            OsString::from("--ephemeral"),
             OsString::from("--settings=off"),
             OsString::from("--register=off"),
-            OsString::from("--resolv-conf=off"),
             OsString::from("--timezone=off"),
             OsString::from("--link-journal=no"),
-            // OsString::from("--console=pipe"),
         ]);
 
         if let Some(machine_id) = container_data.machine_id {
@@ -222,8 +219,13 @@ impl Runtime for Nspawn {
             args.push(tmp);
         }
 
+        if !container_data.persistent_root {
+            args.push(OsString::from("--ephemeral"));
+        }
+
         if !container_data.enable_network {
             args.push(OsString::from("--private-network"));
+            args.push(OsString::from("--resolv-conf=off"));
         }
         args.extend_from_slice(&Self::environment_arguments(container_data, command));
         args.extend_from_slice(&Self::binding_arguments(container_data, command));
@@ -290,6 +292,7 @@ pub struct ContainerData {
     enable_network: bool,
     enable_private_users: bool,
     current_directory: PathBuf,
+    persistent_root: bool,
 }
 
 /// The `Runner` that will run a `Command` in a container
@@ -312,6 +315,7 @@ impl<RT: Clone + std::fmt::Debug + Runtime> Runner<RT> {
                 enable_network: false,
                 enable_private_users: true,
                 current_directory: PathBuf::from("/"),
+                persistent_root: false,
             },
         }
     }
@@ -370,6 +374,13 @@ impl<RT: Clone + std::fmt::Debug + Runtime> Runner<RT> {
     #[must_use]
     pub fn share_users(mut self) -> Self {
         self.container_data.enable_private_users = false;
+        self
+    }
+
+    /// Share users with the container
+    #[must_use]
+    pub fn persistent_root(mut self) -> Self {
+        self.container_data.persistent_root = true;
         self
     }
 

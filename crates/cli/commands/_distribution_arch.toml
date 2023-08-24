@@ -1,8 +1,14 @@
 [command]
+help = """
+Set up arch as a base distribution
+"""
+
 script = """
-    if [ "${CURRENT_PHASE}" = "prepare" ]; then
+    if [ "${CURRENT_PHASE}" = "${PHASE_PREPARE}" ]; then
         export_constant OS_RELEASE_ID_LIKE "arch"
-        export_constant OS_RELEASE_IMAGE_ID "${TIMESTAMP}"
-        export_constant OS_RELEASE_IMAGE_VERSION "${VERSION}"
+        export_constant OS_RELEASE_VERSION_ID "rolling"
     fi
+
+    _pacman
+    _arch_base
 """

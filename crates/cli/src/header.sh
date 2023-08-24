@@ -53,12 +53,12 @@ assert_distribution_initialized() {
 	fi
 }
 
-bb_mknod() {
-	"${BUSYBOX}" mknod "${@}"
-}
-
 bb_mkdir() {
 	"${BUSYBOX}" mkdir "${@}"
+}
+
+bb_mknod() {
+	"${BUSYBOX}" mknod "${@}"
 }
 
 cd "${ROOT_FS}" || error "Failed to cd into ${ROOT_FS}"

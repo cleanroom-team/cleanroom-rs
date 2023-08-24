@@ -1,0 +1,61 @@
+[command]
+help = """
+Install packages for arch linux distributions
+"""
+
+script = """
+    pacman_dir=/usr/lib/pacman
+    cache_dir=/var/lib/pacman
+
+    if [ "${CURRENT_PHASE}" = "${PHASE_PREPARE}" ]; then
+        pacman_dir=/usr/lib/pacman
+
+        bb_mkdir -p "${pacman_dir}/db"
+        bb_mkdir -p "${pacman_dir}/gpg/private-keys-v1.d"
+        bb_mkdir -p "${pacman_dir}/hooks"
+        bb_mkdir -p "${cache_dir}"
+    elif [ "${CURRENT_PHASE}" = "${PHASE_INSTALL}" ]; then
+        test -e "${ROOT_FS}/etc/pacman.conf" || error "pacman.conf is missing!"
+
+        gpg_dir="${ROOT_FS}${pacman_dir}/gpg"
+
+        # # Update local pacman dbs:
+        /usr/bin/pacman \
+            --config "${ROOT_FS}/etc/pacman.conf" \
+            --root "${ROOT_FS}" \
+            --cachedir "${ROOT_FS}${cache_dir}" \
+            --dbpath "${ROOT_FS}${pacman_dir}/db" \
+            --hookdir "${ROOT_FS}${pacman_dir}/hooks" \
+            --gpgdir "${gpg_dir}" \
+            --logfile "${ROOT_FS}/tmp/pacman.log" \
+            -Sy
+        /usr/bin/pacman \
+            --config "${ROOT_FS}/etc/pacman.conf" \
+            --root "${ROOT_FS}" \
+            --cachedir "${ROOT_FS}${cache_dir}" \
+            --dbpath "${ROOT_FS}${pacman_dir}/db" \
+            --hookdir "${ROOT_FS}${pacman_dir}/hooks" \
+            --gpgdir "${gpg_dir}" \
+            --logfile "${ROOT_FS}/tmp/pacman.log" \
+            -Fy
+
+        /usr/bin/pacman-key --init --gpgdir="${gpg_dir}"
+
+        hook_post_pacman_key_init "${gpg_dir}"
+
+        /usr/bin/pacman \
+            --config "${ROOT_FS}/etc/pacman.conf" \
+            --root "${ROOT_FS}" \
+            --cachedir "${ROOT_FS}${cache_dir}" \
+            --dbpath "${ROOT_FS}${pacman_dir}/db" \
+            --hookdir "${ROOT_FS}${pacman_dir}/hooks" \
+            --gpgdir "${gpg_dir}" \
+            --logfile "${ROOT_FS}/tmp/pacman.log" \
+            --noconfirm \
+            -S --needed \
+            ${PACKAGES}
+    fi
+
+    hook_write_pacman_conf
+    _ensure_pacman_polish
+"""

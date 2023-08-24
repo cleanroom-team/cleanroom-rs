@@ -1,0 +1,8 @@
+[command]
+help = """
+Install a very basic SerpentOS Linux -- just the basics
+"""
+
+script = """
+    error "SerpentOS is not yet supported"
+"""

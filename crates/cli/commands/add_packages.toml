@@ -1,0 +1,12 @@
+[command]
+help = """
+Install packages for arch linux distributions
+"""
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_PREPARE}" ]; then
+        assert_distribution_initialized
+
+       export_var PACKAGES "${PACKAGES} ${@}"
+    fi
+"""

@@ -1,8 +1,16 @@
 [command]
+inputs = [{ name = "distribution_id", help = "The base distribution id" }]
+help = """
+Set the base distribution to use for cleanroom.
+\t\t\tPossible values are "arch" and "serpentos".
+"""
+
 script = """
-    if [ "${CURRENT_PHASE}" = "prepare" ]; then
+    if [ "${CURRENT_PHASE}" = "${PHASE_PREPARE}" ]; then
         export_constant OS_RELEASE_ID_LIKE "serpentos"
-        export_constant OS_RELEASE_IMAGE_ID "${TIMESTAMP}"
-        export_constant OS_RELEASE_IMAGE_VERSION "${VERSION}"
+        export_constant OS_RELEASE_VERSION_ID "rolling"
     fi
+
+    _serpent_base
+    _moss
 """

@@ -1,0 +1,13 @@
+[command]
+help = """
+Make sure ldconfig is up to date
+"""
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_POST_INSTALL}" ]; then
+        if [ /usr/sbin/ldconfig ]; then
+            echo "Running ldconfig"
+            /usr/sbin/ldconfig -X
+        fi
+    fi
+"""

@@ -1,0 +1,26 @@
+[command]
+help = """
+Polish away development stuff if no C compiler is found
+"""
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
+        if [ -x /usr/bin/gcc -o -e /usr/bin/clang ]; then
+            echo "C compiler found: Keeping development files"
+        else
+            echo "C compiler *NOT* found: Purging development files"
+            rm -rf /usr/include/* \
+                /usr/lib/lib*.a \
+                /usr/lib/libasan.so* \
+                /usr/lib/liblsan.so* \
+                /usr/lib/libtsan.so* \
+                /usr/lib/libubsan.so* \
+                /usr/src/* \
+                /usr/share/pkgconfig/* \
+                /usr/lib/pkgconfig/* \
+                /usr/share/aclocal/* \
+                /usr/lib/cmake/* \
+                /usr/share/gir-1.0/*
+        fi
+    fi
+"""

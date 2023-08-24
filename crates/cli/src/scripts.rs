@@ -85,6 +85,7 @@ fn script_add_command_definitions(ctx: &RunContext) -> anyhow::Result<Section> {
 
     for (name, cmd) in ctx.command_manager().commands() {
         section.push_str(&format!("{name}() {{\n"));
+        section.push_str(&format!("    status \"{name}\"\n"));
         for i in cmd.inputs() {
             section.push_str(&format!("    {}=\"${{1}}\"; shift\n", i.name()));
         }
@@ -130,7 +131,6 @@ fn script_add_footer() -> Section {
 
 pub fn create_script(ctx: &RunContext, start_command: &str) -> anyhow::Result<PathBuf> {
     let p = ctx.printer();
-    p.h2("Create agent script", true);
     let script_path = ctx.scratch_directory().unwrap().join("script.sh");
 
     let mut script_contents = String::from("#!/bin/sh -e\n");

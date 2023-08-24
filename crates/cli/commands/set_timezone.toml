@@ -1,0 +1,16 @@
+[command]
+help = """
+Set the timezone for a system
+"""
+inputs = [{ name = "tz", help = "The timezone to use" }]
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
+        if [ -f "/usr/share/zoneinfo/${tz}" ]; then
+            rm -f /etc/localtime
+            ( cd /etc && ln -s "../usr/share/zoneinfo/${tz}" localtime )
+        else
+            error "Timezone \"${tz}\" not found in /usr/share/zoneinfo"
+        fi
+    fi
+"""

@@ -1,0 +1,38 @@
+[command]
+inputs = [{ name = "distribution_id", help = "The base distribution id" }]
+help = """
+Set the base distribution to use for cleanroom.
+\t\t\tPossible values are "arch" and "serpentos".
+"""
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_PREPARE}" ]; then
+        export_var PACKAGES ""
+        export_var KERNEL_CMDLINE ""
+
+        export_constant OS_RELEASE_NAME "cleanroom"
+        export_constant OS_RELEASE_PRETTY_NAME "cleanroom Linux"
+        export_constant OS_RELEASE_ID "clrm"
+
+        export_constant OS_RELEASE_IMAGE_ID "${OS_RELEASE_ID}-${OS_RELEASE_VERSION_ID}"
+        export_constant OS_RELEASE_IMAGE_VERSION "${VERSION}"
+
+        export_constant CLRM_BASE_DISTRIBUTION "${distribution_id}"
+    fi
+
+    if [ "${distribution_id}" == "arch" ]; then
+        _distribution_arch
+    elif [ "${distribution_id}" == "serpentos" ]; then
+        _distribution_serpentos
+    else
+       error "Unknown base distribution id ${distribution_id} provided"
+    fi
+
+    _ensure_development
+    _ensure_man_pages
+    _ensure_no_unused_shell_files
+    _ensure_hwdb
+    _ensure_depmod
+    _ensure_ldconfig
+
+"""

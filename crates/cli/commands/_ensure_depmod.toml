@@ -1,0 +1,13 @@
+[command]
+help = """
+Make sure module DB is up to date
+"""
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_POST_INSTALL}" ]; then
+        if [ -x /usr/bin/depmod ]; then
+            echo "Running depmod"
+            /usr/bin/depmod -a -b
+        fi
+    fi
+"""
