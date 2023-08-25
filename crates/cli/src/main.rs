@@ -30,48 +30,6 @@ struct AgentMode {
 }
 
 #[derive(Args, Debug)]
-struct RunMode {
-    /// The directory to create temporary files in
-    #[arg(long = "work-directory", default_value = "./work")]
-    work_directory: PathBuf,
-
-    /// The directory to store the final artifacts into
-    #[arg(long = "artifact-directory", default_value = ".")]
-    artifact_directory: PathBuf,
-
-    /// The directory to store the final artifacts into (defaults to current time if unset)
-    #[arg(long = "timestamp")]
-    timestamp: Option<String>,
-
-    /// The version string to use (defaults to timestamp if unset)
-    #[arg(long = "artifact-version")]
-    artifact_version: Option<String>,
-
-    /// The busybox binary to use
-    #[arg(long = "busybox-binary", default_value = "/usr/bin/busybox")]
-    busybox_binary: PathBuf,
-
-    /// A disk image to use as a bootstrap environment (conflicts with --bootstrap-directory)
-    #[arg(long = "bootstrap-image", conflicts_with = "bootstrap_directory")]
-    bootstrap_image: Option<PathBuf>,
-
-    /// A bootstrap environment installed into a directory (conflicts with --bootstrap-image)
-    #[arg(long = "bootstrap-directory")]
-    bootstrap_directory: Option<PathBuf>,
-
-    /// Enter a debug environment in the provided phase
-    #[arg(long = "extra-binding")]
-    extra_bindings: Vec<String>,
-
-    /// Enter a debug environment in the provided phase
-    #[arg(long = "enter-phase")]
-    enter_phase: Option<cli::Phases>,
-
-    /// The commands to run
-    command: String,
-}
-
-#[derive(Args, Debug)]
 struct CommandListMode {
     /// Print more information
     #[arg(long = "verbose")]
@@ -84,17 +42,88 @@ struct DumpCommand {
     name: String,
 }
 
+#[derive(Args, Debug)]
+struct InitializeCommand {
+    /// The base distribution this configuration is supposed to cover
+    #[arg(long, short, default_value = "arch")]
+    distribution: cli::Distributions,
+    /// The directory to initialize
+    #[arg(long, default_value = ".")]
+    directory: PathBuf,
+}
+
+#[derive(Args, Debug)]
+struct RunMode {
+    /// The directory to create temporary files in
+    #[arg(
+        long = "work-directory",
+        default_value = "./work",
+        env = "CLRM_WORK_DIR"
+    )]
+    work_directory: PathBuf,
+
+    /// The directory to store the final artifacts into
+    #[arg(
+        long = "artifact-directory",
+        default_value = ".",
+        env = "CLRM_ARTIFACT_DIR"
+    )]
+    artifact_directory: PathBuf,
+
+    /// The current time -- used as a version if nothing else is specified
+    #[arg(long = "timestamp")]
+    timestamp: Option<String>,
+
+    /// The version string to use (defaults to timestamp if unset)
+    #[arg(long = "artifact-version")]
+    artifact_version: Option<String>,
+
+    /// The busybox binary to use
+    #[arg(
+        long = "busybox-binary",
+        default_value = "/usr/bin/busybox",
+        env = "CLRM_BUSYBOX"
+    )]
+    busybox_binary: PathBuf,
+
+    /// A disk image to use as a bootstrap environment (conflicts with --bootstrap-directory)
+    #[arg(
+        long = "bootstrap-image",
+        conflicts_with = "bootstrap_directory",
+        env = "CLRM_BOOTSTRAP_IMAGE"
+    )]
+    bootstrap_image: Option<PathBuf>,
+
+    /// A bootstrap environment installed into a directory (conflicts with --bootstrap-image)
+    #[arg(long = "bootstrap-directory", env = "CLRM_BOOTSTRAP_DIR")]
+    bootstrap_directory: Option<PathBuf>,
+
+    /// Enter a debug environment in the provided phase
+    #[arg(long = "extra-binding", env = "CLRM_EXTRA_BINDINGS")]
+    extra_bindings: Vec<String>,
+
+    /// Enter a debug environment in the provided phase
+    #[arg(long = "enter-phase")]
+    enter_phase: Option<cli::Phases>,
+
+    /// The commands to run
+    command: String,
+}
+
 #[derive(Subcommand, Debug)]
 #[command()]
 enum Commands {
     /// Run as an agent inside a container. For internal use
+    #[command(hide = true)]
     Agent(AgentMode),
-    /// Run some command
-    Run(RunMode),
     /// Print a list of known commands
     CommandList(CommandListMode),
     /// Dump a command definition to stdout
     DumpCommand(DumpCommand),
+    /// Initialize a directory to hold a cleanroom configuration
+    Initialize(InitializeCommand),
+    /// Run some command
+    Run(RunMode),
 }
 
 fn create_command_manager() -> anyhow::Result<cli::commands::CommandManager> {
@@ -156,6 +185,7 @@ async fn main() -> anyhow::Result<()> {
             println!("{}", cmd.dump_source());
             Ok(())
         }
+        Commands::Initialize(init) => cli::init::initialize(&init.distribution, &init.directory),
         Commands::Run(run) => {
             let printer = Printer::new(&args.log_level, true);
 

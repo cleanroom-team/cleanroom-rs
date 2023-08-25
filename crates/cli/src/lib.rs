@@ -3,7 +3,18 @@
 
 use clap::ValueEnum;
 
-#[derive(Debug, Clone, Eq, PartialEq, clap::ValueEnum)]
+#[derive(Debug, Clone, Eq, PartialEq, ValueEnum)]
+#[clap(rename_all = "lowercase")]
+pub enum Distributions {
+    /// Arch Linux
+    Arch,
+    /// SerpentOS
+    SerpentOS,
+    /// unknown! This is unsupported!
+    Unknown,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq, ValueEnum)]
 #[clap(rename_all = "snake_case")]
 pub enum Phases {
     /// Prepare for install: Set up package manager and other basic things
@@ -44,6 +55,7 @@ pub mod agent;
 pub mod agent_runner;
 pub mod commands;
 pub mod context;
+pub mod init;
 pub mod printer;
 pub mod scripts;
 

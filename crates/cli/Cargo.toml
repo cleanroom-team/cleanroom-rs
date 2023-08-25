@@ -15,9 +15,15 @@ ansi-escapes = "0.1"
 ansi_term = "0.12"
 anyhow = "1.0"
 chrono = "0.4"
-clap = { version = "4.3", features = ["derive"] }
-serde = { version = "1.0", features = ["derive"]}
-tokio = { version = "1.29", default-features = false, features = [ "io-util", "macros", "process", "rt-multi-thread", "sync" ]}
+clap = { version = "4.3", features = ["derive", "env"] }
+serde = { version = "1.0", features = ["derive"] }
+tokio = { version = "1.29", default-features = false, features = [
+  "io-util",
+  "macros",
+  "process",
+  "rt-multi-thread",
+  "sync",
+] }
 toml = "0.7.6"
 uuid = { version = "1.4.1", features = ["v4"] }
 include_dir = "0.7.3"

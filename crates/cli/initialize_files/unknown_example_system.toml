@@ -1,0 +1,6 @@
+[command]
+help = "This is a simple example system"
+
+script = """
+    echo "Sorry, you are on your own!"
+"""

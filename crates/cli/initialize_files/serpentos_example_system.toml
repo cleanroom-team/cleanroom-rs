@@ -1,0 +1,10 @@
+[command]
+help = "This is a simple serpentos-based system"
+
+script = """
+    define_system serpentos test "Test System" "e7a72cb88e65466294282753fd28686f" laptop
+
+    strip_documentation
+    strip_exotic_gcc_languages
+    strip_legal
+"""

@@ -22,7 +22,15 @@
       "ignoreRegExpList": ["`[^`]+`"]
     }
   ],
-  "words": ["cleanroom", "clrm", "cmdline", "nspawn", "setenv", "tmpfs"],
+  "words": [
+    "cleanroom",
+    "clrm",
+    "cmdline",
+    "nspawn",
+    "serpentos",
+    "setenv",
+    "tmpfs"
+  ],
   "ignorePaths": [
     ".github/actions/*/*.yaml",
     ".github/workflows/*.yaml",
