@@ -1,0 +1,60 @@
+# Copyright © Tobias Hunger <tobias.hunger@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+name: Nightly Build
+
+on:
+  schedule:
+    - cron: "30 01 * * *"
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: "ubuntu-latest"
+    steps:
+      - uses: octokit/request-action@v2.x
+        id: check_last_run
+        with:
+          route: GET /repos/${{github.repository}}/actions/workflows/nightly.yaml/runs?per_page=1&status=completed
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - run: |
+          echo "Previous nighlty SHA: ${{ fromJSON(steps.check_last_run.outputs.data).workflow_runs[0].head_sha }}"
+          echo "This nighlty SHA    : ${{ github.sha }}"
+    outputs:
+      last_sha: ${{ fromJSON(steps.check_last_run.outputs.data).workflow_runs[0].head_sha }}
+
+  release_build_cli:
+    needs: [check]
+    if: needs.check.outputs.last_sha != github.sha
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install rust (nightly)
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: nightly
+          key: relase_build_cli
+      - name: Run cargo build --release
+        run: |
+          cargo +nightly build --release
+          cp target/release/cleanroom .
+          strip --strip-unneeded cleanroom
+          echo "This build was made from\nRepository: ${{github.repositoryUrl}}\nSHA: ${{ github.sha }})" > build.info
+      - name: Upload cli
+        uses: actions/upload-artifact@v3
+        with:
+          name: cleanroom
+          path: |
+            cleanroom
+            LICENSE.md
+            build.info
+      - uses: pyTooling/Actions/releaser@r0
+        with:
+          tag: nightly
+          token: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            cleanroom
+            LICENSE.md
+            build.info

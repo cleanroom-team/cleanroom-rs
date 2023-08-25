@@ -439,7 +439,7 @@ impl<RT: Clone + std::fmt::Debug + Runtime> Runner<RT> {
                         Ok(exit_status) => {
                             match exit_status.code() {
                                 Some(exit_code) if exit_code == command. expected_exit_code => {
-                                    trace(&format!("Child process finished with expected exit code {}", exit_code));
+                                    trace(&format!("Child process finished with expected exit code {exit_code}"));
                                     return Ok(());
                                 },
                                 Some(exit_code) => {

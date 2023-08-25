@@ -3,6 +3,9 @@
 
 //! The `Context` to run in
 
+#[cfg(test)]
+use crate::printer::{LogLevel, Printer};
+
 use std::{
     collections::BTreeMap,
     ffi::{OsStr, OsString},
@@ -204,11 +207,11 @@ const WORK_DIR: &str = "WORK_DIR";
 
 impl Context {
     #[cfg(test)]
-    pub fn test_system(&self, log_level: LogLevel) -> RunContext {
-        use crate::printer::LogLevel;
+    pub fn test_system(&self, log_level: &LogLevel) -> RunContext {
+        use crate::commands::CommandManagerBuilder;
 
-        let printer = Printer::new(log_level);
-        let commands = self.command_manager_builder().build();
+        let printer = Rc::new(Printer::new(log_level, false));
+        let commands = CommandManagerBuilder::default().build();
 
         let mut ctx = RunContext {
             commands,

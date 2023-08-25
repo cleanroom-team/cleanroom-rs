@@ -220,7 +220,7 @@ pub async fn run_agent(
 
 #[cfg(test)]
 mod tests {
-    use crate::printer::{LogLevel, Printer};
+    use crate::printer::LogLevel;
 
     use super::*;
 
@@ -230,10 +230,8 @@ mod tests {
         expect_handled: bool,
         expect_error: bool,
     ) -> crate::context::RunContext {
-        let printer = Printer::new(&LogLevel::Off, false);
-
-        let ctx = crate::context::ContextBuilder::new(printer).build();
-        let mut ctx = ctx.test_system();
+        let ctx = crate::context::ContextBuilder::default().build();
+        let mut ctx = ctx.test_system(&LogLevel::Off);
 
         ctx.set("FOO", "bar", false, false).unwrap();
         ctx.set("BAR", "foo", false, false).unwrap();

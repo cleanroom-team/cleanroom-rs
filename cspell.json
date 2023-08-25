@@ -24,9 +24,10 @@
   ],
   "words": ["cleanroom", "clrm", "cmdline", "nspawn", "setenv", "tmpfs"],
   "ignorePaths": [
-    "cspell.json",
+    ".github/actions/*/*.yaml",
     ".github/workflows/*.yaml",
     "crates/cli/commands",
-    "crates/cli/src/*.sh"
+    "crates/cli/src/*.sh",
+    "cspell.json"
   ]
 }

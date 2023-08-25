@@ -65,6 +65,6 @@ mod tests {
             assert!(known_names.insert(pn.clone()));
             assert!(pn.chars().all(|c| c.is_ascii_lowercase() || c == '_'));
         }
-        assert_eq!(known_names.len(), 6);
+        assert_eq!(known_names.len(), 7);
     }
 }

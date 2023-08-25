@@ -1,0 +1,85 @@
+# Copyright © Tobias Hunger <tobias.hunger@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+name: CI
+
+on:
+  push:
+    branches: [main, "feature/*"]
+  pull_request:
+    branches: [main, "feature/*"]
+  workflow_dispatch:
+
+jobs:
+  cargo_fmt:
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-D warnings"
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install rust (nightly)
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: nightly
+          components: rustfmt
+          key: cargo_fmt
+      - name: cargo version
+        run: cargo +nightly --version
+      - name: Run cargo fmt
+        run: cargo +nightly fmt
+
+  cargo_check:
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-D warnings"
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install rust (nightly)
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: nightly
+          key: cargo_check
+      - name: cargo version
+        run: cargo +nightly --version
+      - name: Run cargo check
+        run: cargo +nightly check
+
+  cargo_clippy:
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-D warnings"
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install rust (nightly)
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: nightly
+          components: clippy
+          key: cargo_clippy
+      - name: cargo version
+        run: cargo +nightly --version
+      - name: Run cargo clippy
+        run: cargo +nightly clippy
+
+  cargo_test:
+    runs-on: ubuntu-latest
+    env:
+      RUSTFLAGS: "-D warnings"
+    steps:
+      - uses: actions/checkout@v3
+      - name: Install rust (nightly)
+        uses: ./.github/actions/setup-rust
+        with:
+          toolchain: nightly
+          key: cargo_test
+      - name: cargo version
+        run: cargo +nightly --version
+      - name: Run cargo test
+        run: cargo +nightly test
+
+  spellcheck: # run the action
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: streetsidesoftware/cspell-action@v3

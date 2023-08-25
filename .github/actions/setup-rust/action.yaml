@@ -1,0 +1,37 @@
+# Copyright © Tobias Hunger <tobias.hunger@gmail.com>
+# SPDX-License-Identifier: GPL-3.0-or-later
+
+---
+name: Setup Rust support
+description: Set up rust tooling via rustup
+
+inputs:
+  toolchain:
+    description: "Rust toolchain to use (default: stable)"
+    required: false
+    default: stable
+  target:
+    description: "Rust target to use"
+    required: false
+    default: ""
+  components:
+    description: "Rust components to install"
+    required: false
+    default: ""
+  key:
+    description: "Extra cache keying information"
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Install Rust ${{ inputs.toolchain }}
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: ${{ inputs.toolchain }}
+        components: ${{ inputs.components }}
+        target: ${{ inputs.target }}
+    - uses: Swatinem/rust-cache@v2
+      with:
+        key: ${{ inputs.key }}-1
