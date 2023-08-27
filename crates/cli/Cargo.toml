@@ -1,3 +1,4 @@
+# cSpell: ignore tempfile
 [package]
 name = "cli"
 version = "0.1.0"
@@ -17,6 +18,7 @@ anyhow = "1.0"
 chrono = "0.4"
 clap = { version = "4.3", features = ["derive", "env"] }
 serde = { version = "1.0", features = ["derive"] }
+tempfile = "3.8"
 tokio = { version = "1.29", default-features = false, features = [
   "io-util",
   "macros",

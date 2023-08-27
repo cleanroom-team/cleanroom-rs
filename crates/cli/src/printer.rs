@@ -22,6 +22,7 @@ pub struct Printer {
     exit_on_error: bool,
     error_count: RefCell<i32>,
     lock: RefCell<std::io::StdoutLock<'static>>,
+    status_stack: RefCell<Vec<String>>,
 }
 
 impl Debug for Printer {
@@ -40,6 +41,7 @@ impl Printer {
             lock: RefCell::new(std::io::stdout().lock()),
             exit_on_error,
             error_count: RefCell::new(0),
+            status_stack: RefCell::new(Vec::new()),
         };
 
         if result.log_level != LogLevel::Off {
@@ -172,6 +174,18 @@ impl Printer {
                 message,
             );
         }
+    }
+
+    #[allow(unused)]
+    pub fn push_status(&self, message: &str) {
+        self.status_stack.borrow_mut().push(message.to_string());
+        self.h3(message, true);
+    }
+
+    #[allow(unused)]
+    pub fn pop_status(&self) {
+        let status = self.status_stack.borrow_mut().pop();
+        self.h3(&status.unwrap_or_default(), true);
     }
 
     #[allow(unused)]

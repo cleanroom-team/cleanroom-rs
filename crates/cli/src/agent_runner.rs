@@ -50,6 +50,11 @@ fn parse_stdout(m: &str, command_prefix: &str, ctx: &mut RunContext) -> bool {
     } else if let Some(status) = cmd.strip_prefix("STATUS ") {
         let status = status.trim().trim_matches('"');
         ctx.printer().h3(status, true);
+    } else if let Some(status) = cmd.strip_prefix("PUSH ") {
+        let status = status.trim().trim_matches('"');
+        ctx.printer().push_status(status);
+    } else if cmd == "POP" {
+        ctx.printer().pop_status();
     } else {
         p.error(&format!("Agent asked to process unknown command {cmd:?}"))
     }
@@ -58,6 +63,13 @@ fn parse_stdout(m: &str, command_prefix: &str, ctx: &mut RunContext) -> bool {
 
 fn run_in_bootstrap(phase: &Phases) -> bool {
     phase == &Phases::Install || phase == &Phases::BuildArtifacts || phase == &Phases::TestArtifacts
+}
+
+fn mount_artifacts_directory(phase: &Phases) -> bool {
+    phase == &Phases::BuildArtifacts || phase == &Phases::TestArtifacts
+}
+fn mount_root_fs(phase: &Phases) -> bool {
+    phase != &Phases::TestArtifacts
 }
 
 fn create_runner(
@@ -75,14 +87,27 @@ fn create_runner(
     let mut runner = if run_in_bootstrap(phase) {
         p.debug(&format!("Running \"{phase}\" [BOOTSTRAP]"));
         p.h2(&format!("Run \"{phase}\" [BOOTSTRAP]"), true);
-        Nspawn::default_runner(ctx.bootstrap_environment().clone())?
-            // .binding(Binding::tmpfs(&PathBuf::from("/tmp")))
-            .binding(Binding::rw(
-                &ctx.root_directory().unwrap(),
-                &PathBuf::from("/tmp/clrm/root_fs"),
-            ))
-            .env("CLRM_CONTAINER", "bootstrap")
-            .env("ROOT_FS", "/tmp/clrm/root_fs")
+        let mut runner = Nspawn::default_runner(ctx.bootstrap_environment().clone())?
+            .env("CLRM_CONTAINER", "bootstrap");
+
+        if mount_root_fs(phase) {
+            runner = runner
+                .binding(Binding::rw(
+                    &ctx.root_directory().unwrap(),
+                    &PathBuf::from("/tmp/clrm/root_fs"),
+                ))
+                .env("ROOT_FS", "/tmp/clrm/root_fs")
+        }
+        if mount_artifacts_directory(phase) {
+            runner = runner
+                .binding(Binding::rw(
+                    &ctx.artifacts_directory().unwrap(),
+                    &PathBuf::from("/tmp/clrm/artifacts"),
+                ))
+                .env("ARTIFACTS_FS", "/tmp/clrm/root_fs")
+        }
+
+        runner
     } else {
         p.debug(&format!("Running \"{phase}\" [ROOT]"));
         p.h2(&format!("Run \"{phase}\" [ROOT]"), true);

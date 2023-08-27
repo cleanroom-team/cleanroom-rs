@@ -24,20 +24,16 @@ struct Arguments {
 struct ExtraCommandPath {
     /// Extends the default lookup path for commands. Later directories can
     /// overwrite commands in earlier directories.
-    #[arg(
-        long,
-        env = "CLRM_EXTRA_COMMAND_PATH",
-        value_delimiter = ':',
-        default_value = ""
-    )]
-    extra_command_path: Vec<PathBuf>,
+    #[arg(long, env = "CLRM_EXTRA_COMMAND_PATH", value_delimiter = ':')]
+    extra_command_path: Option<Vec<PathBuf>>,
 }
 
 impl std::ops::Deref for ExtraCommandPath {
     type Target = Vec<PathBuf>;
 
     fn deref(&self) -> &Self::Target {
-        &self.extra_command_path
+        static EMPTY: Vec<PathBuf> = Vec::new();
+        self.extra_command_path.as_ref().unwrap_or(&EMPTY)
     }
 }
 
@@ -124,7 +120,7 @@ struct RunMode {
     extra_command_path: ExtraCommandPath,
 
     /// Enter a debug environment in the provided phase
-    #[arg(long, env = "CLRM_NETWORKED_PHASES", value_delimiter = ':')]
+    #[arg(long, env = "CLRM_NETWORKED_PHASES", value_delimiter = ',')]
     networked_phases: Vec<cli::Phases>,
 
     /// Enter a debug environment in the provided phase
@@ -159,7 +155,7 @@ fn create_command_manager(
     for command_path in extra_command_path {
         builder
             .scan_for_commands(command_path)
-            .context("Failed to find command in `.`")?;
+            .context(format!("Failed to find command in {command_path:?}"))?;
     }
 
     Ok(builder.build())

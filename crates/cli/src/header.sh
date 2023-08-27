@@ -21,6 +21,17 @@ status() {
 
 status "Setup: ${CURRENT_PHASE} (${CLRM_CONTAINER})"
 
+push_status() {
+	message="${1}"
+	shift
+
+	echo "${__command_prefix}: PUSH \"${message}\""
+}
+
+pop_status() {
+	echo "${__command_prefix}: POP"
+}
+
 export_constant() {
 	key="${1}"
 	shift

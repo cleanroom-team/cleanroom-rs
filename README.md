@@ -16,6 +16,10 @@ You will need to have the following binaries on the system you run cleanroom on:
 - `/usr/bin/systemd-nspawn` to set up containers with
 - `busybox` as a statically compiled binary as a OS agnostic run environment
   inside and outside of containers.
+
+  Binaries can be downloaded from here: https://busybox.net/downloads/binaries/
+  Most distributions have `busybox` packages, that work just as well.
+
 - `direnv` helps but is not strictly necessary. Without it you will need to
   source a `.env` file to configure your shell for `cleanroom`.
 
