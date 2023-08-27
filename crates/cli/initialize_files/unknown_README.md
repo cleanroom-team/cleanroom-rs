@@ -12,7 +12,7 @@ You opted for some unknown distribution that is not supported yet. Have fun!
 
    Make sure the variables are sensible:
 
-- `CLRM_ARTIFACT_DIRECTORY` needs to be the absolute path to some directory
+- `CLRM_ARTIFACTS_DIRECTORY` needs to be the absolute path to some directory
   where the finished artifacts will be stored. This needs several GB of
   space!
 - `CLRM_BOOTSTRAP_DIR` is the directory you created above -- leave commented

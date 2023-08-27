@@ -194,9 +194,10 @@ pub struct RunContext {
     printer: Rc<crate::printer::Printer>,
     bootstrap_environment: crate::RunEnvironment,
     variables: ContextMap,
+    networked_phases: Vec<crate::Phases>,
 }
 
-const ARTIFACT_DIR: &str = "ARTIFACT_DIR";
+const ARTIFACTS_DIR: &str = "ARTIFACTS_DIR";
 const BUSYBOX_BINARY: &str = "BUSYBOX_BINARY";
 const MY_BINARY: &str = "MY_BINARY";
 const ROOT_DIR: &str = "ROOT_DIR";
@@ -220,12 +221,14 @@ impl Context {
             bootstrap_environment: crate::RunEnvironment::Directory(PathBuf::from(
                 "/tmp/bootstrap_dir",
             )),
+            networked_phases: Vec::default(),
         };
 
         ctx.set(BUSYBOX_BINARY, "/usr/bin/busybox", true, true)
             .unwrap();
         ctx.set(MY_BINARY, "/foo/agent", true, true).unwrap();
-        ctx.set(ARTIFACT_DIR, "/foo/artifacts", true, true).unwrap();
+        ctx.set(ARTIFACTS_DIR, "/foo/artifacts", true, true)
+            .unwrap();
         ctx.set(ROOT_DIR, "/foo/work/XXXX/root_fs", true, true)
             .unwrap();
         ctx.set(SCRATCH_DIR, "/foo/work/XXXX", true, true).unwrap();
@@ -241,12 +244,13 @@ impl Context {
         commands: crate::commands::CommandManager,
         printer: Rc<crate::printer::Printer>,
         work_directory: &Path,
-        artifact_directory: &Path,
+        artifacts_directory: &Path,
         busybox_binary: &Path,
         myself: &Path,
         bootstrap_environment: crate::RunEnvironment,
+        networked_phases: &[crate::Phases],
     ) -> anyhow::Result<RunContext> {
-        let artifact_directory = util::resolve_directory(artifact_directory)
+        let artifacts_directory = util::resolve_directory(artifacts_directory)
             .context("Failed to resolve work directory")?;
         let work_directory =
             util::resolve_directory(work_directory).context("Failed to resolve work directory")?;
@@ -273,18 +277,23 @@ impl Context {
             return Err(anyhow!("{myself:?} is no file or not executable"));
         }
 
+        let mut networked_phases = networked_phases.to_vec();
+        networked_phases.sort_unstable();
+        networked_phases.dedup();
+
         let mut ctx = RunContext {
             commands,
             printer,
             variables: self.variables.clone(),
             bootstrap_environment,
+            networked_phases,
         };
 
         ctx.set_raw(BUSYBOX_BINARY, busybox_binary.as_os_str(), true, true)
             .unwrap();
         ctx.set_raw(MY_BINARY, myself.as_os_str(), true, true)
             .unwrap();
-        ctx.set_raw(ARTIFACT_DIR, artifact_directory.as_os_str(), true, true)
+        ctx.set_raw(ARTIFACTS_DIR, artifacts_directory.as_os_str(), true, true)
             .unwrap();
         ctx.set_raw(ROOT_DIR, root_directory.as_os_str(), true, true)
             .unwrap();
@@ -334,6 +343,15 @@ impl std::fmt::Display for RunContext {
         } else {
             writeln!(f, "  commands = {{\n{}  }},", self.commands)?;
         }
+        if self.networked_phases.is_empty() {
+            writeln!(f, "  networked_phases = {{}},")?;
+        } else {
+            writeln!(
+                f,
+                "  networked_phases  = {{ {:?} }},",
+                self.networked_phases
+            )?;
+        }
         writeln!(f, "}}")
     }
 }
@@ -347,8 +365,8 @@ impl RunContext {
         self.printer.clone()
     }
 
-    pub fn artifact_directory(&self) -> Option<PathBuf> {
-        self.get_raw(ARTIFACT_DIR).map(PathBuf::from)
+    pub fn artifacts_directory(&self) -> Option<PathBuf> {
+        self.get_raw(ARTIFACTS_DIR).map(PathBuf::from)
     }
 
     pub fn busybox_binary(&self) -> Option<PathBuf> {
@@ -424,5 +442,9 @@ impl RunContext {
 
     pub fn command_manager(&self) -> &crate::commands::CommandManager {
         &self.commands
+    }
+
+    pub fn wants_network(&self, phase: &crate::Phases) -> bool {
+        self.networked_phases.contains(phase)
     }
 }

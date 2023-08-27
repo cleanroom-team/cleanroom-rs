@@ -15,24 +15,55 @@ Architecture = x86_64
 SigLevel = Required DatabaseOptional
 LocalFileSigLevel = Optional
 
-[custom]
-SigLevel = Optional TrustAll
-Server = file:///tmp/clrm/pkgs/fritz.box/$repo/os/$arch
+# REPOSITORIES
+#   - can be defined here or included from another file
+#   - pacman will search repositories in the order defined here
+#   - local/custom mirrors can be added here or in separate files
+#   - repositories listed first will take precedence when packages
+#     have identical names, regardless of version number
+#   - URLs will have $repo replaced by the name of the current repo
+#   - URLs will have $arch replaced by the name of the architecture
+#
+# Repository entries are of the format:
+#       [repo-name]
+#       Server = ServerName
+#       Include = IncludePath
+#
+# The header [repo-name] is crucial - it must be present and
+# uncommented to enable the repo.
+#
 
-[testing]
-Server = file:///tmp/clrm/pkgs/archlinux.org/$repo/os/$arch
+
+# The testing repositories are disabled by default. To enable, uncomment the
+# repo name header and Include lines. You can add preferred servers immediately
+# after the header, and they will be used before the default mirrors.
+
+#[core-testing]
+#Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
 
 [core]
-Server = file:///tmp/clrm/pkgs/archlinux.org/$repo/os/$arch
+Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
+
+#[extra-testing]
+#Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
 
 [extra]
-Server = file:///tmp/clrm/pkgs/archlinux.org/$repo/os/$arch
+Server = https://geo.mirror.pkgbuild.com/$repo/os/$arch
 
-[community-testing]
-Server = file:///tmp/clrm/pkgs/archlinux.org/$repo/os/$arch
+# If you want to run 32 bit applications on your x86_64 system,
+# enable the multilib repositories as required here.
 
-[community]
-Server = file:///tmp/clrm/pkgs/archlinux.org/$repo/os/$arch
+#[multilib-testing]
+#Include = /etc/pacman.d/mirrorlist
+
+#[multilib]
+#Include = /etc/pacman.d/mirrorlist
+
+# An example of a custom package repository.  See the pacman manpage for
+# tips on creating your own repositories.
+#[custom]
+#SigLevel = Optional TrustAll
+#Server = file:///home/custompkgs
 EOF
     fi
 """

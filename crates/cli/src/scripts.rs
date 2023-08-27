@@ -148,9 +148,7 @@ pub fn create_script(ctx: &RunContext, start_command: &str) -> anyhow::Result<Pa
     write!(output, "{script_contents}")
         .context(format!("Failed to write agent script into {script_path:?}"))?;
 
-    p.trace(&format!(
-        "Full agent script at {script_path:?}:\n{script_contents}"
-    ));
+    p.trace(&format!("Full agent script at {script_path:?}"));
 
     Ok(script_path)
 }

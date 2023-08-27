@@ -14,7 +14,7 @@ pub enum Distributions {
     Unknown,
 }
 
-#[derive(Debug, Clone, Eq, PartialEq, ValueEnum)]
+#[derive(Debug, Clone, Eq, Ord, PartialEq, PartialOrd, ValueEnum)]
 #[clap(rename_all = "snake_case")]
 pub enum Phases {
     /// Prepare for install: Set up package manager and other basic things

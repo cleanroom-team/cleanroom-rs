@@ -95,6 +95,12 @@ fn create_runner(
         .persistent_root()
     };
 
+    runner = if ctx.wants_network(phase) {
+        runner.with_network().env("PHASE_IS_NETWORKED", "1")
+    } else {
+        runner.env("PHASE_IS_NETWORKED", "0")
+    };
+
     runner = runner
         .machine_id(DEFAULT_MACHINE_ID)
         .share_users()
