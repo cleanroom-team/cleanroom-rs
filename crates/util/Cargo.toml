@@ -7,4 +7,4 @@ edition = "2021"
 
 [dependencies]
 thiserror = { version = "1.0" }
-nix = { version = "0.26", default-features = false, features = ["user"]}
+nix = { version = "0.27", default-features = false, features = ["user"] }
