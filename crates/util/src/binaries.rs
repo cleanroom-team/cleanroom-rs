@@ -43,12 +43,9 @@ pub fn find_in_path(binary_name: &str) -> crate::Result<Option<PathBuf>> {
     let home_dir = home_directory()?;
     for p in PathIterator::new(&path) {
         let p = resolve_directory_impl(&PathBuf::from(p), &home_dir, None)?;
-        let p = p
-            .canonicalize()
-            .map_err(|_| crate::Error::InvalidDirectory {
-                reason: "Failed to canonicalize directory".to_string(),
-                directory: p.as_os_str().to_os_string(),
-            })?;
+        let Ok(p) = p.canonicalize() else {
+            continue;
+        };
 
         // Just skip over non-existing directories.
         if !p.exists() {
