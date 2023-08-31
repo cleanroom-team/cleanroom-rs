@@ -14,7 +14,7 @@ cleanroom="${1}"
 readonly cleanroom
 shift
 
-## Fix up .env file
+## Fix up .envrc file
 
 # There is no global replace in busybox sed...
 "${busybox}" sed -i "s!%%%DIR%%%!${dir}!" README.md
@@ -23,16 +23,16 @@ shift
 "${busybox}" sed -i "s!%%%DIR%%%!${dir}!" README.md
 "${busybox}" sed -i "s!%%%DIR%%%!${dir}!" README.md
 
-"${busybox}" sed -i "s!%%%DIR%%%!${dir}!" .env
-"${busybox}" sed -i "s!%%%DIR%%%!${dir}!" .env
-"${busybox}" sed -i "s!%%%DIR%%%!${dir}!" .env
-"${busybox}" sed -i "s!%%%DIR%%%!${dir}!" .env
-"${busybox}" sed -i "s!%%%DIR%%%!${dir}!" .env
-"${busybox}" sed -i "s!%%%BUSYBOX%%%!${busybox}!" .env
-"${busybox}" sed -i "s!%%%BUSYBOX%%%!${busybox}!" .env
-"${busybox}" sed -i "s!%%%BUSYBOX%%%!${busybox}!" .env
-"${busybox}" sed -i "s!%%%BUSYBOX%%%!${busybox}!" .env
-"${busybox}" sed -i "s!%%%BUSYBOX%%%!${busybox}!" .env
+"${busybox}" sed -i "s!%%%DIR%%%!${dir}!" .envrc
+"${busybox}" sed -i "s!%%%DIR%%%!${dir}!" .envrc
+"${busybox}" sed -i "s!%%%DIR%%%!${dir}!" .envrc
+"${busybox}" sed -i "s!%%%DIR%%%!${dir}!" .envrc
+"${busybox}" sed -i "s!%%%DIR%%%!${dir}!" .envrc
+"${busybox}" sed -i "s!%%%BUSYBOX%%%!${busybox}!" .envrc
+"${busybox}" sed -i "s!%%%BUSYBOX%%%!${busybox}!" .envrc
+"${busybox}" sed -i "s!%%%BUSYBOX%%%!${busybox}!" .envrc
+"${busybox}" sed -i "s!%%%BUSYBOX%%%!${busybox}!" .envrc
+"${busybox}" sed -i "s!%%%BUSYBOX%%%!${busybox}!" .envrc
 
 ## Arch:
 

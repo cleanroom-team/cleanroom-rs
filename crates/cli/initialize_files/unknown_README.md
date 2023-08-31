@@ -8,7 +8,7 @@ You opted for some unknown distribution that is not supported yet. Have fun!
    as a directory containing a SerpentOS installation or by using some
    Linux image file.
 
-2. Check `.env` in this directory
+2. Check `.envrc` in this directory
 
    Make sure the variables are sensible:
 
@@ -23,7 +23,7 @@ You opted for some unknown distribution that is not supported yet. Have fun!
   or build this as a static binary!
 - `CLRM_WORK_DIR` holds temporary data. Make sure you have enough space there
 
-3. Source `.env` to make sure the environment variables are set in your shell
+3. Source `.envrc` to make sure the environment variables are set in your shell
 
 4. run `/full/path/to/cleanroom run example_system` to build the system defined
    in the `example_system.toml` file

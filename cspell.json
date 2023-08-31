@@ -26,6 +26,7 @@
     "cleanroom",
     "clrm",
     "cmdline",
+    "envrc",
     "nspawn",
     "serpentos",
     "setenv",

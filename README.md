@@ -21,7 +21,7 @@ You will need to have the following binaries on the system you run cleanroom on:
   Most distributions have `busybox` packages, that work just as well.
 
 - `direnv` helps but is not strictly necessary. Without it you will need to
-  source a `.env` file to configure your shell for `cleanroom`.
+  source a `.envrc` file to configure your shell for `cleanroom`.
 
 Everything else is done in containers managed or built by `cleanroom`.
 
@@ -52,5 +52,5 @@ start:
 
 This will set up a playground for you to experiment in:-)
 
-Once `cleanroom initialize` is done check the generated `.env` file and source
-it into your running shell (`source .env` in bash).
+Once `cleanroom initialize` is done check the generated `.envrc` file and source
+it into your running shell (`source .envrc` in bash).

@@ -18,7 +18,7 @@ I hope you enjoy the experience.
 
    might already do the trick ;-)
 
-2. Check `.env` in this directory
+2. Check `.envrc` in this directory
 
    Make sure the variables are sensible:
 
@@ -33,7 +33,7 @@ I hope you enjoy the experience.
   this packaged as `busybox`
 - `CLRM_WORK_DIR` holds temporary data. Make sure you have enough space there
 
-3. Source `.env` to make sure the environment variables are set in your shell
+3. Source `.envrc` to make sure the environment variables are set in your shell
 
 4. Check the pacman.conf defined in `commands/hook_write_pacman_conf.toml` and
    change the package mirror servers defined in there. The default should just
