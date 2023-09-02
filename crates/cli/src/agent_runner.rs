@@ -84,9 +84,11 @@ fn create_runner(
     let agent_script =
         crate::scripts::create_script(ctx, command).context("Failed to create agent script")?;
 
+    let mut flags = vec![];
+
     let mut runner = if run_in_bootstrap(phase) {
         p.debug(&format!("Running \"{phase}\" [BOOTSTRAP]"));
-        p.h2(&format!("Run \"{phase}\" [BOOTSTRAP]"), true);
+        flags.push("BOOTSTRAP");
         let mut runner = Nspawn::default_runner(ctx.bootstrap_environment().clone())?
             .env("CLRM_CONTAINER", "bootstrap");
 
@@ -110,7 +112,7 @@ fn create_runner(
         runner
     } else {
         p.debug(&format!("Running \"{phase}\" [ROOT]"));
-        p.h2(&format!("Run \"{phase}\" [ROOT]"), true);
+        flags.push("ROOT");
         Nspawn::default_runner(RunEnvironment::Directory(
             ctx.root_directory().unwrap().clone(),
         ))?
@@ -121,8 +123,10 @@ fn create_runner(
     };
 
     runner = if ctx.wants_network(phase) {
+        flags.push("NET");
         runner.with_network().env("PHASE_IS_NETWORKED", "1")
     } else {
+        flags.push("no net");
         runner.env("PHASE_IS_NETWORKED", "0")
     };
 
@@ -147,6 +151,8 @@ fn create_runner(
             Binding::try_from(extra.as_str()).context("Failed to apply extra arguments")?;
         runner = runner.binding(binding);
     }
+
+    p.h2(&format!("Running \"{phase}\" [{}]", flags.join(", ")), true);
 
     Ok(runner)
 }
