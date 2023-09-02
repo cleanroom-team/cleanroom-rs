@@ -177,7 +177,7 @@ impl ContextBuilder {
 impl Default for ContextBuilder {
     fn default() -> Self {
         Self {
-            timestamp: format!("{}", chrono::Utc::now().format("%Y%m%d%H%M%S")),
+            timestamp: format!("{}", chrono::Local::now().format("%Y%m%d.%H%M")),
             version: None,
         }
     }

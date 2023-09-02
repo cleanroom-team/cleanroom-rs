@@ -32,8 +32,6 @@ script = """
     _ensure_man_pages
     _ensure_no_unused_shell_files
     _ensure_hwdb
-    _ensure_depmod
-    _ensure_ldconfig
 
     export_root_fs
 """

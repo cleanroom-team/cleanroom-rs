@@ -106,7 +106,7 @@ impl Printer {
         self.print_headline(
             1,
             quiet,
-            &format!("\n\n{}", ansi_term::Color::Red.paint("*******")),
+            &format!("\n{}", ansi_term::Color::Red.paint("*******")),
             &format!("{}", ansi_term::Style::new().bold().paint(message)),
         );
     }
@@ -116,7 +116,7 @@ impl Printer {
         self.print_headline(
             2,
             quiet,
-            &format!("\n{}", ansi_term::Color::Red.paint("+++++++")),
+            &format!("{}", ansi_term::Color::Red.paint("+++++++")),
             message,
         );
     }

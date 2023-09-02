@@ -87,7 +87,6 @@ fn create_runner(
     let mut flags = vec![];
 
     let mut runner = if run_in_bootstrap(phase) {
-        p.info(&format!("Running \"{phase}\" [BOOTSTRAP]"));
         flags.push("BOOTSTRAP");
         let mut runner = Nspawn::default_runner(ctx.bootstrap_environment().clone())?
             .env("CLRM_CONTAINER", "bootstrap");
@@ -111,7 +110,6 @@ fn create_runner(
 
         runner
     } else {
-        p.debug(&format!("Running \"{phase}\" [ROOT]"));
         flags.push("ROOT");
         Nspawn::default_runner(RunEnvironment::Directory(
             ctx.root_directory().unwrap().clone(),
@@ -152,7 +150,10 @@ fn create_runner(
         runner = runner.binding(binding);
     }
 
-    p.h2(&format!("Running \"{phase}\" [{}]", flags.join(", ")), true);
+    p.h2(
+        &format!("Running \"{phase}\" [{}]", flags.join(", ")),
+        false,
+    );
 
     Ok(runner)
 }
