@@ -13,10 +13,7 @@ script = """
             rm -rf /var/lib/pacman/*
         else
             echo "Pacman is *NOT* installed: Purge pacman files"
-            rm -rf /etc/pacman.conf /etc/pacman.d \
-               /usr/lib/pacman \
-               /var/lib/pacman \
-               /var/cache
+            strip_pacman_db
         fi
     fi
 """

@@ -28,6 +28,40 @@ script = """
        error "Unknown base distribution id ${distribution_id} provided"
     fi
 
+    if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
+        # polish away files that make no sense in an immutable setup (or are handled by us!)
+        rm -f \
+            /etc/crypttab \
+            /etc/fstab \
+            /etc/machine-id \
+            /usr/bin/kernel-install \
+            /usr/bin/systemd-firstboot \
+            /usr/lib/systemd/system-generators/systemd-system-update-generator \
+            /usr/lib/systemd/system/*/ldconfig.* \
+            /usr/lib/systemd/system/*/shadow.* \
+            /usr/lib/systemd/system/*/system-update-cleanup. *\
+            /usr/lib/systemd/system/*/system-update-pre.* \
+            /usr/lib/systemd/system/*/system-update.* \
+            /usr/lib/systemd/system/*/systemd-boot-update.* \
+            /usr/lib/systemd/system/*/systemd-hwdb-update.* \
+            /usr/lib/systemd/system/ldconfig.* \
+            /usr/lib/systemd/system/shadow.* \
+            /usr/lib/systemd/system/sysinit.target.wants/systemd-firstboot.service \
+            /usr/lib/systemd/system/system-update-cleanup.* \
+            /usr/lib/systemd/system/system-update-pre.* \
+            /usr/lib/systemd/system/system-update.* \
+            /usr/lib/systemd/system/systemd-boot-update.* \
+            /usr/lib/systemd/system/systemd-firstboot.service \
+            /usr/lib/systemd/system/systemd-hwdb-update.* \
+            /usr/lib/systemd/system/systemd-update-done.service \
+            /usr/lib/systemd/systemd-update-done \
+
+        rm -rf \
+            /etc/kernel \
+            /usr/lib/kernel \
+            /usr/share/factory/etc/*
+    fi
+
     _ensure_development
     _ensure_man_pages
     _ensure_no_unused_shell_files

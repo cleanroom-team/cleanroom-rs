@@ -22,27 +22,7 @@ script = """
     if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
         # polish away files that make no sense in an immutable setup (or are handled by us!)
         rm -f \
-            /etc/crypttab \
-            /etc/fstab \
-            /etc/machine-id \
-            /usr/bin/kernel-install \
-            /usr/bin/systemd-firstboot \
             /usr/lib/factory/tmpfiles.d/man-db.conf \
-            /usr/lib/systemd/system/*/ldconfig.* \
-            /usr/lib/systemd/system/*/shadow.* \
-            /usr/lib/systemd/system/*/systemd-boot-update.* \
-            /usr/lib/systemd/system/*/systemd-hwdb-update.* \
-            /usr/lib/systemd/system/ldconfig.* \
-            /usr/lib/systemd/system/shadow.* \
-            /usr/lib/systemd/system/sysinit.target.wants/systemd-firstboot.service \
-            /usr/lib/systemd/system/systemd-boot-update.* \
-            /usr/lib/systemd/system/systemd-firstboot.service \
-            /usr/lib/systemd/system/systemd-hwdb-update.* \
             /usr/lib/tmpfiles.d/arch.conf
-
-        rm -rf \
-            /etc/kernel \
-            /usr/lib/kernel \
-            /usr/share/factory/etc/*
     fi
 """

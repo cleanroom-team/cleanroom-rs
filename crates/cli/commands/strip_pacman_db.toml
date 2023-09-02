@@ -1,0 +1,13 @@
+[command]
+help = """
+Delete all pacman DB file. This breaks the pacman command!
+"""
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
+        rm -rf /etc/pacman.conf /etc/pacman.d \
+           /usr/lib/pacman \
+           /var/lib/pacman \
+           /var/cache
+    fi
+"""

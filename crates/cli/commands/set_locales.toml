@@ -1,0 +1,23 @@
+[command]
+help = """
+Set the supported locales (incl. encoding!) for a system
+(e.g. "en_US.UTF8"). Takes a list of locales.
+"""
+inputs = [{ name = "tz", help = "The timezone to use" }]
+
+script = """
+    # We rely on pacman running locale.gen for us!
+
+    if [ "${CURRENT_PHASE}" = "${PHASE_PREPARE}" ]; then
+        for l in "$@" ; do
+            echo "$l" >> /etc/locale.gen
+        done
+    fi
+    if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
+        rm -rf \
+            /etc/locale.gen \
+            /usr/bin/locale-gen \
+            /usr/bin/localedef \
+            /usr/share/locale/*
+    fi
+"""
