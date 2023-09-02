@@ -195,6 +195,7 @@ pub struct RunContext {
     variables: ContextMap,
     networked_phases: Vec<crate::Phases>,
     scratch_dir: tempfile::TempDir,
+    debug_options: Vec<crate::DebugOptions>,
 }
 
 const ARTIFACTS_DIR: &str = "ARTIFACTS_DIR";
@@ -222,6 +223,7 @@ impl Context {
             )),
             networked_phases: Vec::default(),
             scratch_dir: tempfile::TempDir::new().unwrap(),
+            debug_options: vec![],
         };
 
         ctx.set(BUSYBOX_BINARY, "/usr/bin/busybox", true, true)
@@ -248,6 +250,7 @@ impl Context {
         myself: &Path,
         bootstrap_environment: crate::RunEnvironment,
         networked_phases: &[crate::Phases],
+        debug_options: &[crate::DebugOptions],
     ) -> anyhow::Result<RunContext> {
         let artifacts_directory = util::resolve_directory(artifacts_directory)
             .context("Failed to resolve work directory")?;
@@ -279,6 +282,14 @@ impl Context {
         networked_phases.sort_unstable();
         networked_phases.dedup();
 
+        let debug_options = {
+            let mut options = debug_options.to_vec();
+            options.sort_unstable();
+            options.dedup();
+            options.reserve_exact(0);
+            options
+        };
+
         let mut ctx = RunContext {
             commands,
             printer,
@@ -286,6 +297,7 @@ impl Context {
             bootstrap_environment,
             networked_phases,
             scratch_dir,
+            debug_options,
         };
 
         ctx.set_raw(BUSYBOX_BINARY, busybox_binary.as_os_str(), true, true)
@@ -443,5 +455,9 @@ impl RunContext {
 
     pub fn wants_network(&self, phase: &crate::Phases) -> bool {
         self.networked_phases.contains(phase)
+    }
+
+    pub fn check_debug_option(&self, debug_option: &crate::DebugOptions) -> bool {
+        self.debug_options.contains(debug_option)
     }
 }

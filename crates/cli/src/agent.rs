@@ -22,8 +22,12 @@ pub fn run(command_prefix: &str, phase: &crate::Phases) -> anyhow::Result<()> {
         .wait()
         .context("Failed running the agent script for {phase}")?;
     if !exit_status.success() {
+        let exit_code = exit_status
+            .code()
+            .map(|c| format!("{c}"))
+            .unwrap_or_else(|| String::from("<unknown>"));
         Err(anyhow::anyhow!(format!(
-            "Agent script in phase {phase} quit with error"
+            "Agent script in phase {phase} quit with exit_code {exit_code}"
         )))
     } else {
         Ok(())

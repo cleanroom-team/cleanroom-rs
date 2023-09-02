@@ -28,6 +28,8 @@
     "cmdline",
     "envrc",
     "nspawn",
+    "rustc",
+    "rustfmt",
     "serpentos",
     "setenv",
     "tmpfs"

@@ -3,6 +3,15 @@
 
 use clap::ValueEnum;
 
+#[derive(Debug, Clone, Eq, Ord, PartialEq, PartialOrd, ValueEnum)]
+#[clap(rename_all = "snake_case")]
+pub enum DebugOptions {
+    /// Print the agent script to trace output
+    PrintAgentScript,
+    /// Trace the agent scripts execution
+    TraceAgentScript,
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, ValueEnum)]
 #[clap(rename_all = "lowercase")]
 pub enum Distributions {

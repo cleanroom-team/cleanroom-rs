@@ -6,7 +6,7 @@ use std::{path::PathBuf, rc::Rc};
 use anyhow::Context;
 use clap::{Args, Parser, Subcommand};
 
-use cli::printer::Printer;
+use cli::{printer::Printer, DebugOptions};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -129,6 +129,9 @@ struct RunMode {
 
     /// The commands to run
     command: String,
+
+    #[arg(long, env = "CLRM_TRACE_SCRIPT", value_delimiter = ',', hide = true)]
+    debug_options: Option<Vec<cli::DebugOptions>>,
 }
 
 #[allow(clippy::large_enum_variant)] // This is used exactly once, a bit of wasted space is fine
@@ -179,6 +182,11 @@ fn create_run_context(printer: Printer, run: &RunMode) -> anyhow::Result<cli::co
     let bootstrap_environment =
         cli::RunEnvironment::new(&run.bootstrap_directory, &run.bootstrap_image)?;
 
+    let debug_options = {
+        static DEFAULT: Vec<DebugOptions> = vec![];
+        run.debug_options.as_ref().unwrap_or(&DEFAULT)
+    };
+
     let ctx = base_ctx
         .create_run_context(
             create_command_manager(&run.extra_command_path)?,
@@ -189,6 +197,7 @@ fn create_run_context(printer: Printer, run: &RunMode) -> anyhow::Result<cli::co
             &myself,
             bootstrap_environment,
             &run.networked_phases,
+            debug_options,
         )
         .context("Failed to set up system context")?;
 

@@ -142,6 +142,7 @@ impl Printer {
 
         let old_count = self.error_count.replace_with(|&mut v| v + 1);
         if self.exit_on_error || old_count == std::i32::MAX / 2 {
+            self.clear_line();
             std::process::exit(old_count + 1);
         }
     }

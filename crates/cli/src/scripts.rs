@@ -135,6 +135,10 @@ pub fn create_script(ctx: &RunContext, start_command: &str) -> anyhow::Result<Pa
 
     let mut script_contents = String::from("#!/bin/sh -e\n");
 
+    if ctx.check_debug_option(&crate::DebugOptions::TraceAgentScript) {
+        script_contents += "set -x\n";
+    }
+
     script_contents += &script_add_header().extract();
     script_contents += &script_add_phase_definitions().extract();
     script_contents += &script_add_command_definitions(ctx)?.extract();
@@ -149,6 +153,10 @@ pub fn create_script(ctx: &RunContext, start_command: &str) -> anyhow::Result<Pa
         .context(format!("Failed to write agent script into {script_path:?}"))?;
 
     p.trace(&format!("Full agent script at {script_path:?}"));
+
+    if ctx.check_debug_option(&crate::DebugOptions::PrintAgentScript) {
+        p.trace(&format!("Script contents is:\n{script_contents}"));
+    }
 
     Ok(script_path)
 }
