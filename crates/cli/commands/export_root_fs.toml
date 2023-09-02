@@ -1,0 +1,13 @@
+[command]
+help = """
+Export the entire root fs into the artifacts directory
+"""
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_BUILD_ARTIFACTS}" ]; then
+        version_dir="${ARTIFACTS_FS}/${HOST_NAME}/${VERSION}"
+
+        bb_mkdir -p "${version_dir}"
+        cp --reflink=auto -r "${ROOT_FS}" "${version_dir}"
+    fi
+"""

@@ -87,7 +87,7 @@ fn create_runner(
     let mut flags = vec![];
 
     let mut runner = if run_in_bootstrap(phase) {
-        p.debug(&format!("Running \"{phase}\" [BOOTSTRAP]"));
+        p.info(&format!("Running \"{phase}\" [BOOTSTRAP]"));
         flags.push("BOOTSTRAP");
         let mut runner = Nspawn::default_runner(ctx.bootstrap_environment().clone())?
             .env("CLRM_CONTAINER", "bootstrap");
@@ -104,9 +104,9 @@ fn create_runner(
             runner = runner
                 .binding(Binding::rw(
                     &ctx.artifacts_directory().unwrap(),
-                    &PathBuf::from("/tmp/clrm/artifacts"),
+                    &PathBuf::from("/tmp/clrm/artifacts_fs"),
                 ))
-                .env("ARTIFACTS_FS", "/tmp/clrm/root_fs")
+                .env("ARTIFACTS_FS", "/tmp/clrm/artifacts_fs")
         }
 
         runner
@@ -165,8 +165,7 @@ pub async fn enter_agent_phase(
     extra_bindings: &[String],
 ) -> anyhow::Result<()> {
     let p = ctx.printer();
-    p.debug(&format!("Entering container in {phase} with {ctx}"));
-    p.h2("Enter container", true);
+    p.h2("Enter container in phase \"{phase}\"", false);
     let runner = create_runner(ctx, command, phase, extra_bindings)?.with_network();
 
     let command = {
@@ -202,8 +201,6 @@ pub async fn run_agent_phase(
     extra_bindings: &[String],
 ) -> anyhow::Result<()> {
     let p = ctx.printer();
-    p.debug(&format!("Automatically running {phase} with {ctx}"));
-    p.h2("Run in container", true);
     let runner = create_runner(ctx, command, phase, extra_bindings)?;
 
     let command_prefix = uuid::Uuid::new_v4().to_string();
@@ -245,6 +242,9 @@ pub async fn run_agent(
     p.h1("Run Agent", true);
 
     for phase in Phases::iter() {
+        if ctx.check_debug_option(&crate::DebugOptions::PrintRunContext) {
+            p.debug(&format!("RunContext in {phase} is:\n{ctx}"));
+        }
         if enter_phase.as_ref() == Some(phase) {
             return enter_agent_phase(ctx, command, phase, extra_bindings).await;
         } else {

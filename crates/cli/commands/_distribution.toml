@@ -35,5 +35,5 @@ script = """
     _ensure_depmod
     _ensure_ldconfig
 
-    _export_root_fs
+    export_root_fs
 """

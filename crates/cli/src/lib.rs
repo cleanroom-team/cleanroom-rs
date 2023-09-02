@@ -6,10 +6,12 @@ use clap::ValueEnum;
 #[derive(Debug, Clone, Eq, Ord, PartialEq, PartialOrd, ValueEnum)]
 #[clap(rename_all = "snake_case")]
 pub enum DebugOptions {
-    /// Print the agent script to trace output
+    /// Print the agent script to debug output
     PrintAgentScript,
     /// Trace the agent scripts execution
     TraceAgentScript,
+    /// Print the run context to debug output as we enter a new phase
+    PrintRunContext,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, ValueEnum)]

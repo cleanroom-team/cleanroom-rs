@@ -155,7 +155,7 @@ pub fn create_script(ctx: &RunContext, start_command: &str) -> anyhow::Result<Pa
     p.trace(&format!("Full agent script at {script_path:?}"));
 
     if ctx.check_debug_option(&crate::DebugOptions::PrintAgentScript) {
-        p.trace(&format!("Script contents is:\n{script_contents}"));
+        p.debug(&format!("Script contents is:\n{script_contents}"));
     }
 
     Ok(script_path)
