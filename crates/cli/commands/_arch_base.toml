@@ -24,5 +24,7 @@ script = """
         rm -f \
             /usr/lib/factory/tmpfiles.d/man-db.conf \
             /usr/lib/tmpfiles.d/arch.conf
+
+        bb_mkdir "/etc/systemd/nspawn"
     fi
 """

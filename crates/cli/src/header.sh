@@ -64,6 +64,10 @@ assert_distribution_initialized() {
 	fi
 }
 
+bb_chmod() {
+	"${BUSYBOX}" chmod "${@}"
+}
+
 bb_mkdir() {
 	"${BUSYBOX}" mkdir "${@}"
 }
