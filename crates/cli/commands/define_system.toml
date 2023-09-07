@@ -16,8 +16,13 @@ script = """
 		    error "Distribution already initialized."
 	    fi
 
+        test -z "${host_name}" && error "Host name is empty"
+        test -z "${pretty_name}" && error "Pretty name is empty"
+        test -z "${machine_id}" && error "Machine-id is empty"
+
         export_constant HOST_NAME "${host_name}"
         export_constant PRETTY_HOST_NAME "${pretty_name}"
+        export_constant MACHINE_ID "${machine_id}"
     fi
 
     _distribution "${distribution}"

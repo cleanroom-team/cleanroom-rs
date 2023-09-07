@@ -1,0 +1,26 @@
+[command]
+help = """
+Make sure a system has basic network connectivity
+"""
+
+script = """
+    if [ "${distribution_id}" == "arch" ]; then
+        add_packages systemd-resolvconf inetutils
+
+        systemd_enable systemd-networkd.service systemd-resolved.service
+
+        if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
+            rm /etc/resolv.conf
+            ( cd /etc ; ln -s /run/systemd/resolve/stub-resolv.conf resolv.conf )
+
+            bb_mkdir -p /usr/lib/systemd/resolved.conf.d
+            cat <<EOF > /usr/lib/systemd/resolved.conf.d/no_fallback_dns.conf
+[Resolve]
+FallbackDNS=
+EOF
+            bb_chmod 644 /usr/lib/systemd/resolved.conf.d/*.conf
+        fi
+    else
+       error "Unknown base distribution id ${distribution_id} is not supported by pkg_networked_system"
+    fi
+"""

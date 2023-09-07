@@ -35,22 +35,18 @@ pop_status() {
 export_constant() {
 	key="${1}"
 	shift
-	value="${1}"
-	shift
 
-	eval "${key}=\"${value}\""
+	eval "${key}=\"${*}\""
 	readonly "${key}"
-	echo "${__command_prefix}: SET_RO \"${key}\"=\"${value}\""
+	echo "${__command_prefix}: SET_RO \"${key}\"=\"${*}\""
 }
 
 export_var() {
 	key="${1}"
 	shift
-	value="${1}"
-	shift
 
-	eval "${key}=\"${value}\""
-	echo "${__command_prefix}: SET \"${key}\"=\"${value}\""
+	eval "${key}=\"${*}\""
+	echo "${__command_prefix}: SET \"${key}\"=\"${*}\""
 }
 
 error() {

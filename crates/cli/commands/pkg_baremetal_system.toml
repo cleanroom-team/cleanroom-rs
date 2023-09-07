@@ -1,0 +1,41 @@
+[command]
+help = """
+A minimal system able to run on bare metal hardware (includes pkg_bootable_system)
+"""
+
+script = """
+    pkg_bootable_system
+
+    if [ "${distribution_id}" == "arch" ]; then
+        add_packages \
+            acpi_call \
+            bash \
+            bridge-utils \
+            efibootmgr \
+            ethtool \
+            fish \
+            fwupd \
+            gawk \
+            gptfdisk \
+            grep \
+            hdparm \
+            htop \
+            libfido2 \
+            minicom \
+            nbd \
+            opensc \
+            power-profiles-daemon \
+            powertop \
+            sbsigntools \
+            smartmontools \
+            smartmontools \
+            sysstat \
+            tpm2-tss \
+            wget \
+            x86_energy_perf_policy
+
+        systemd_enable pcscd.service power-profiles-daemon.service
+    else
+       error "Unknown base distribution id ${distribution_id} is not supported by pkg_baremetal_system"
+    fi
+"""

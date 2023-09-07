@@ -7,8 +7,9 @@ Set the base distribution to use for cleanroom.
 
 script = """
     if [ "${CURRENT_PHASE}" = "${PHASE_PREPARE}" ]; then
-        export_var PACKAGES ""
         export_var KERNEL_CMDLINE ""
+        export_var PACKAGES ""
+        export_var ENABLED_SYSTEMD_UNITS ""
 
         export_constant OS_RELEASE_NAME "cleanroom"
         export_constant OS_RELEASE_PRETTY_NAME "cleanroom Linux"
@@ -20,6 +21,12 @@ script = """
         export_constant CLRM_BASE_DISTRIBUTION "${distribution_id}"
     fi
 
+    if [ "${CURRENT_PHASE}" = "${PHASE_INSTALL}" ]; then
+        export_constant KERNEL_CMDLINE "${KERNEL_CMDLINE}"
+        export_constant PACKAGES "${PACKAGES}"
+        export_constant ENABLED_SYSTEMD_UNITS "${ENABLED_SYSTEMD_UNITS}"
+    fi
+
     if [ "${distribution_id}" == "arch" ]; then
         _distribution_arch
     elif [ "${distribution_id}" == "serpentos" ]; then
@@ -29,6 +36,17 @@ script = """
     fi
 
     if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
+        # Put /opt into usr
+        mv /opt /usr
+        ln -s usr/opt opt
+
+        # Make sure there is no /opt!
+        bb_mkdir -p /usr/lib/tmpfiles.d
+        cat <<EOF > /usr/lib/tmpfiles.d/opt.conf
+# Add opt:
+L /opt - - - - /usr/opt
+EOF
+
         # polish away files that make no sense in an immutable setup (or are handled by us!)
         rm -f \
             /etc/crypttab \
@@ -52,7 +70,6 @@ script = """
             /usr/lib/systemd/system/sysinit.target.wants/systemd-firstboot.service \
             /usr/lib/systemd/system/system-update-cleanup.* \
             /usr/lib/systemd/system/system-update-pre.* \
-            /usr/lib/systemd/system/system-update.* \
             /usr/lib/systemd/system/systemd-boot-update.* \
             /usr/lib/systemd/system/systemd-firstboot.service \
             /usr/lib/systemd/system/systemd-hwdb-update.* \
@@ -63,6 +80,7 @@ script = """
         rm -rf \
             /etc/kernel \
             /usr/lib/kernel \
+            /usr/lib/systemd/system/system-update.* \
             /usr/lib/sysusers.d \
             /usr/share/factory/etc/* \
             /usr/share/man/cat* \

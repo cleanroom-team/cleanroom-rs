@@ -87,7 +87,11 @@ fn script_add_command_definitions(ctx: &RunContext) -> anyhow::Result<Section> {
         section.push_str(&format!("{name}() {{\n"));
         section.push_str(&format!("    push_status \"{name}\"\n"));
         for i in cmd.inputs() {
-            section.push_str(&format!("    {}=\"${{1}}\"; shift\n", i.name()));
+            let optional_shift = if i.optional() { " || true" } else { "" };
+            section.push_str(&format!(
+                "    {}=\"${{1}}\"; shift{optional_shift}\n",
+                i.name()
+            ));
         }
         section.push_str(&format!("\n{}\n    pop_status\n}}\n\n", cmd.script));
     }

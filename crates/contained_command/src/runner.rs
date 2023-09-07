@@ -98,9 +98,12 @@ impl Nspawn {
         let RunEnvironment::Directory(root_dir) = &self.run_environment else {
             return Ok(());
         };
-        let usr_dir = root_dir.join("usr");
-        if !usr_dir.exists() {
-            std::fs::create_dir(usr_dir)?;
+        let dirs = ["usr"];
+        for d in dirs {
+            let full_dir = root_dir.join(d);
+            if !full_dir.exists() {
+                std::fs::create_dir(full_dir)?;
+            }
         }
 
         Ok(())

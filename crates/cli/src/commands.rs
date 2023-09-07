@@ -29,7 +29,12 @@ fn validate_command_name(name: &str) -> anyhow::Result<()> {
 #[serde(untagged)]
 pub enum Input {
     Basic(String),
-    Full { name: String, help: Option<String> },
+    Full {
+        name: String,
+        help: Option<String>,
+        #[serde(default)]
+        optional: bool,
+    },
 }
 
 impl Input {
@@ -44,6 +49,13 @@ impl Input {
         match self {
             Input::Basic(_) => None,
             Input::Full { help, .. } => help.clone(),
+        }
+    }
+
+    pub fn optional(&self) -> bool {
+        match self {
+            Input::Basic(_) => false,
+            Input::Full { optional, .. } => *optional,
         }
     }
 }

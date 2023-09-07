@@ -1,0 +1,93 @@
+[command]
+help = """
+Make a system bootable (includes pkg_networked_system and pkg_kernel)
+"""
+
+script = """
+    pkg_networked_system
+    pkg_kernel
+
+    if [ "${distribution_id}" == "arch" ]; then
+        add_packages \
+            alsa-firmware \
+            btrfs-progs \
+            cryptsetup \
+            dosfstools \
+            e2fsprogs erofs-utils \
+            iproute2 iputils \
+            linux-firmware lvm2 \
+            mdadm \
+            pciutils \
+            rsync \
+            sed squashfs-tools \
+            tar \
+            usbutils \
+            wireguard-tools \
+            xfsprogs
+
+        systemd_enable systemd-timesyncd.service systemd-oomd.service
+
+        if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
+            rm /etc/resolv.conf
+            ( cd /etc ; ln -s /run/systemd/resolve/stub-resolv.conf resolv.conf )
+
+            echo "vfat" > /etc/modules-load.d/filesystems.conf
+            cat <<EOF > /etc/modprobe.d/10-net-blacklist.conf
+blacklist dccp
+blacklist sctp
+blacklist rds
+blacklist tipc
+EOF
+            cat <<EOF > /etc/modprobe.d/60-fs-blacklist.conf
+blacklist adfs
+blacklist affs
+blacklist bfs
+blacklist befs
+blacklist cramfs
+blacklist efs
+blacklist exofs
+blacklist freevxfs
+blacklist gfs2
+blacklist hfs
+blacklist hpfs
+blacklist jbd2
+blacklist jffs2
+blacklist jfs
+blacklist minix
+blacklist nilfs2
+blacklist ocfs2
+blacklist omfs
+blacklist orangefs
+blacklist reiserfs
+blacklist romfs
+blacklist ubifs
+blacklist ufs
+blacklist zonefs
+EOF
+
+            echo "fs.inotify.max_user_watches = 524288" > /etc/sysctl.d/99-max-filewatchers.conf
+
+            cat <<EOF > /etc/sysctl.d/65-ip-redirection.conf
+# Never accept redirects or source routes.
+net.ipv4.conf.all.accept_redirects = 0
+net.ipv4.conf.all.accept_source_route = 0
+net.ipv6.conf.all.accept_redirects = 0
+net.ipv6.conf.all.accept_source_route = 0
+EOF
+
+            cat <<EOF > /etc/sysctl.d/75-ipv6-tempaddr.conf
+# Enable IPv6 Privacy Extensions
+net.ipv6.conf.all.use_tempaddr = 2
+net.ipv6.conf.default.use_tempaddr = 2
+EOF
+
+            cat <<EOF > /etc/sysctl.d/80-ipv4-syncookies.conf
+# Protection from the SYN flood attack.
+net.ipv4.tcp_syncookies = 1
+EOF
+
+        fi
+    else
+       error "Unknown base distribution id ${distribution_id} is not supported by pkg_bootable_system"
+    fi
+"""

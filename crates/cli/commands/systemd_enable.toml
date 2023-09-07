@@ -1,0 +1,24 @@
+[command]
+help = """
+Enable systemd units.
+"""
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_PREPARE}" ]; then
+        export_var ENABLED_SYSTEMD_UNITS "${ENABLED_SYSTEMD_UNITS+$ENABLED_SYSTEMD_UNITS }${@}"
+    fi
+
+    if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
+        if [ -x "/usr/bin/systemctl" ]; then
+            /usr/bin/systemctl enable --system ${ENABLED_SYSTEMD_UNITS}
+        else
+            echo "Systemctl not found: Will not enable ${ENABLED_SYSTEMD_UNITS}"
+        fi
+    fi
+
+    if [ "${CURRENT_PHASE}" = "${PHASE_TEST}" ]; then
+        if [ -x "/usr/bin/systemctl" ]; then
+            /usr/bin/systemctl is-enabled --system ${ENABLED_SYSTEMD_UNITS}
+        fi
+    fi
+"""
