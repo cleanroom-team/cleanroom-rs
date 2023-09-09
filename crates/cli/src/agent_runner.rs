@@ -1,7 +1,7 @@
 // Copyright © Tobias Hunger <tobias.hunger@gmail.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::{context::RunContext, Phases};
+use crate::{context::BuildContext, Phases};
 
 use anyhow::Context;
 use contained_command::{Binding, Command, Nspawn, RunEnvironment, Runner};
@@ -16,7 +16,7 @@ const DEFAULT_MACHINE_ID: [u8; 32] = [
     b'9', b'7', b'e', b'1', b'd', b'f', b'5', b'e', b'b', b'3', b'b', b'2', b'6', b'4', b'2', b'2',
 ];
 
-fn parse_stdout(m: &str, command_prefix: &str, ctx: &mut RunContext) -> bool {
+fn parse_stdout(m: &str, command_prefix: &str, ctx: &mut BuildContext) -> bool {
     let p = ctx.printer();
     let Some(cmd) = m.strip_prefix(command_prefix) else {
         return false;
@@ -73,7 +73,7 @@ fn mount_root_fs(phase: &Phases) -> bool {
 }
 
 fn create_runner(
-    ctx: &RunContext,
+    ctx: &BuildContext,
     command: &str,
     phase: &Phases,
     extra_bindings: &[String],
@@ -160,7 +160,7 @@ fn create_runner(
 
 #[allow(clippy::needless_pass_by_ref_mut)] // FIXME: It's not useless: It's passed on to parse_stdout!
 pub async fn enter_agent_phase(
-    ctx: &mut RunContext,
+    ctx: &mut BuildContext,
     command: &str,
     phase: &Phases,
     extra_bindings: &[String],
@@ -196,7 +196,7 @@ pub async fn enter_agent_phase(
 
 #[allow(clippy::needless_pass_by_ref_mut)] // FIXME: It's not useless: It's passed on to parse_stdout!
 pub async fn run_agent_phase(
-    ctx: &mut RunContext,
+    ctx: &mut BuildContext,
     command: &str,
     phase: &Phases,
     extra_bindings: &[String],
@@ -207,7 +207,7 @@ pub async fn run_agent_phase(
     let command_prefix = uuid::Uuid::new_v4().to_string();
     let command = {
         let mut command = Command::new("/tmp/clrm/agent");
-        command.arg("agent");
+        command.arg("build-agent");
         command.arg(&format!("--command-prefix={command_prefix}"));
         command.arg(&phase.to_string());
         command
@@ -233,8 +233,8 @@ pub async fn run_agent_phase(
 }
 
 #[allow(clippy::needless_pass_by_ref_mut)] // FIXME: It's not useless: It's passed on to run_agent_phase
-pub async fn run_agent(
-    ctx: &mut RunContext,
+pub async fn run_build_agent(
+    ctx: &mut BuildContext,
     command: &str,
     enter_phase: &Option<Phases>,
     extra_bindings: &[String],
@@ -267,7 +267,7 @@ mod tests {
         command_prefix: &str,
         expect_handled: bool,
         expect_error: bool,
-    ) -> crate::context::RunContext {
+    ) -> crate::context::BuildContext {
         let ctx = crate::context::ContextBuilder::default().build();
         let mut ctx = ctx.test_system(&LogLevel::Off);
 

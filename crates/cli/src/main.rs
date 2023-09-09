@@ -38,7 +38,7 @@ impl std::ops::Deref for ExtraCommandPath {
 }
 
 #[derive(Args, Debug)]
-struct AgentMode {
+struct BuildAgentCommand {
     /// The prefix used to send commands to the agent runner
     #[arg(long, short)]
     command_prefix: String,
@@ -47,7 +47,7 @@ struct AgentMode {
 }
 
 #[derive(Args, Debug)]
-struct CommandListMode {
+struct CommandListCommand {
     /// Print more information
     #[arg(long)]
     verbose: bool,
@@ -79,7 +79,7 @@ struct InitializeCommand {
 }
 
 #[derive(Args, Debug)]
-struct RunMode {
+struct BuildCommand {
     /// The directory to create temporary files in
     #[arg(long, default_value = "./work", env = "CLRM_WORK_DIR")]
     work_directory: PathBuf,
@@ -140,15 +140,15 @@ struct RunMode {
 enum Commands {
     /// Run as an agent inside a container. For internal use
     #[command(hide = true)]
-    Agent(AgentMode),
+    BuildAgent(BuildAgentCommand),
     /// Print a list of known commands
-    CommandList(CommandListMode),
+    CommandList(CommandListCommand),
     /// Dump a command definition to stdout
     DumpCommand(DumpCommand),
     /// Initialize a directory to hold a cleanroom configuration
     Initialize(InitializeCommand),
     /// Run some command
-    Run(RunMode),
+    Build(BuildCommand),
 }
 
 fn create_command_manager(
@@ -164,7 +164,10 @@ fn create_command_manager(
     Ok(builder.build())
 }
 
-fn create_run_context(printer: Printer, run: &RunMode) -> anyhow::Result<cli::context::RunContext> {
+fn create_build_context(
+    printer: Printer,
+    run: &BuildCommand,
+) -> anyhow::Result<cli::context::BuildContext> {
     let base_ctx = {
         let mut builder = cli::context::ContextBuilder::default();
         if let Some(ts) = &run.timestamp {
@@ -209,7 +212,7 @@ async fn main() -> anyhow::Result<()> {
     let args = Arguments::parse();
 
     match &args.command {
-        Commands::Agent(agent) => cli::agent::run(&agent.command_prefix, &agent.phase),
+        Commands::BuildAgent(agent) => cli::agent::run(&agent.command_prefix, &agent.phase),
         Commands::CommandList(list) => {
             let command_manager = create_command_manager(&list.extra_command_path)?;
             println!("{}", command_manager.list_commands(list.verbose));
@@ -224,7 +227,7 @@ async fn main() -> anyhow::Result<()> {
         Commands::Initialize(init) => {
             cli::init::initialize(&init.busybox_binary, &init.distribution, &init.directory)
         }
-        Commands::Run(run) => {
+        Commands::Build(build) => {
             let printer = Printer::new(&args.log_level, true);
 
             printer.h1("Setup", true);
@@ -234,15 +237,15 @@ async fn main() -> anyhow::Result<()> {
             printer.debug(&format!("Command line arguments: {args:?}"));
 
             let mut ctx =
-                create_run_context(printer, run).context("Failed to create system context")?;
+                create_build_context(printer, build).context("Failed to create system context")?;
 
             let printer = ctx.printer();
             printer.h1("Run agent", true);
-            cli::agent_runner::run_agent(
+            cli::agent_runner::run_build_agent(
                 &mut ctx,
-                &run.command,
-                &run.enter_phase,
-                &run.extra_bindings,
+                &build.command,
+                &build.enter_phase,
+                &build.extra_bindings,
             )
             .await
             .context("Failed to drive agent")?;

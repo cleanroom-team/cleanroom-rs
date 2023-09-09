@@ -6,7 +6,7 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 
-use crate::context::RunContext;
+use crate::context::BuildContext;
 
 struct Section {
     name: String,
@@ -80,7 +80,7 @@ fn script_add_phase_definitions() -> Section {
     section
 }
 
-fn script_add_command_definitions(ctx: &RunContext) -> anyhow::Result<Section> {
+fn script_add_command_definitions(ctx: &BuildContext) -> anyhow::Result<Section> {
     let mut section = Section::new("command definition");
 
     for (name, cmd) in ctx.command_manager().commands() {
@@ -99,7 +99,7 @@ fn script_add_command_definitions(ctx: &RunContext) -> anyhow::Result<Section> {
     Ok(section)
 }
 
-fn script_add_system_environment(ctx: &RunContext) -> Section {
+fn script_add_system_environment(ctx: &BuildContext) -> Section {
     let mut section = Section::new("system environment");
     for ce in ctx.iter().filter(|ce| !ce.is_internal) {
         let value = escape(&ce.value);
@@ -133,7 +133,7 @@ fn script_add_footer() -> Section {
     section
 }
 
-pub fn create_script(ctx: &RunContext, start_command: &str) -> anyhow::Result<PathBuf> {
+pub fn create_script(ctx: &BuildContext, start_command: &str) -> anyhow::Result<PathBuf> {
     let p = ctx.printer();
     let script_path = ctx.scratch_directory().join("script.sh");
 

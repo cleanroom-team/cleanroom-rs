@@ -2,12 +2,24 @@
 help = """
 Export the entire root fs into the artifacts directory
 """
+inputs = [ { name = "usr_only", help = "Only store /usr (on/off)"}]
 
 script = """
     if [ "${CURRENT_PHASE}" = "${PHASE_BUILD_ARTIFACTS}" ]; then
         version_dir="${ARTIFACTS_FS}/${HOST_NAME}/${VERSION}"
 
+        if [ "${usr_only}" = "on" -o "${usr_only}" = "ON" ]; then
+            ( cd "${ROOT_FS}" && \
+                bb_mkdir -p usr/lib/boot && \
+                tar -cf usr/lib/boot/root-fs.tar efi etc root && \
+                tar -cf usr/lib/boot/var-fs.tar var && \
+                "${BUSYBOX}" find . ! -name usr -maxdepth 1 -exec rm -rf {} \\; )
+        fi
+
         bb_mkdir -p "${version_dir}"
         cp --reflink=auto -r "${ROOT_FS}" "${version_dir}"
+
+        export_constant ARTIFACT_DIR "${version_dir}"
+        export_constant ARTIFACT_ROOT_FS "${version_dir}/root_fs"
     fi
 """

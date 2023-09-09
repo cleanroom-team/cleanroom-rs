@@ -1,0 +1,18 @@
+[command]
+help = """
+Generate and export a dm-verity image for a ARTIFACT_ROOT_IMAGE.
+"""
+
+script = """
+    export_root_image
+
+    if [ "${CURRENT_PHASE}" = "${PHASE_BUILD_ARTIFACTS}" ]; then
+        test -x /usr/bin/veritysetup || error "veritysetup not found"
+
+        vrty_image="${ARTIFACT_DIR}/vrty.img"
+
+        /usr/bin/veritysetup format "${ARTIFACT_ROOT_IMAGE}" "${vrty_image}"
+
+        export_constant "ARTIFACT_VRTY_IMAGE" "${vrty_image}"
+    fi
+"""

@@ -188,7 +188,7 @@ pub struct Context {
     variables: ContextMap,
 }
 
-pub struct RunContext {
+pub struct BuildContext {
     commands: crate::commands::CommandManager,
     printer: Rc<crate::printer::Printer>,
     bootstrap_environment: crate::RunEnvironment,
@@ -208,13 +208,13 @@ const WORK_DIR: &str = "WORK_DIR";
 
 impl Context {
     #[cfg(test)]
-    pub fn test_system(&self, log_level: &LogLevel) -> RunContext {
+    pub fn test_system(&self, log_level: &LogLevel) -> BuildContext {
         use crate::commands::CommandManagerBuilder;
 
         let printer = Rc::new(Printer::new(log_level, false));
         let commands = CommandManagerBuilder::default().build();
 
-        let mut ctx = RunContext {
+        let mut ctx = BuildContext {
             commands,
             printer,
             variables: self.variables.clone(),
@@ -251,7 +251,7 @@ impl Context {
         bootstrap_environment: crate::RunEnvironment,
         networked_phases: &[crate::Phases],
         debug_options: &[crate::DebugOptions],
-    ) -> anyhow::Result<RunContext> {
+    ) -> anyhow::Result<BuildContext> {
         let artifacts_directory = util::resolve_directory(artifacts_directory)
             .context("Failed to resolve work directory")?;
         let work_directory =
@@ -290,7 +290,7 @@ impl Context {
             options
         };
 
-        let mut ctx = RunContext {
+        let mut ctx = BuildContext {
             commands,
             printer,
             variables: self.variables.clone(),
@@ -339,7 +339,7 @@ impl Context {
     }
 }
 
-impl std::fmt::Display for RunContext {
+impl std::fmt::Display for BuildContext {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "SystemContext {{")?;
         if self.variables.is_empty() {
@@ -365,7 +365,7 @@ impl std::fmt::Display for RunContext {
     }
 }
 
-impl RunContext {
+impl BuildContext {
     // Getters:
     pub fn bootstrap_environment(&self) -> &RunEnvironment {
         &self.bootstrap_environment

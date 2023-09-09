@@ -19,6 +19,8 @@ script = """
         export_constant OS_RELEASE_IMAGE_VERSION "${VERSION}"
 
         export_constant CLRM_BASE_DISTRIBUTION "${distribution_id}"
+
+        bb_mkdir /efi
     fi
 
     if [ "${CURRENT_PHASE}" = "${PHASE_INSTALL}" ]; then
@@ -45,6 +47,13 @@ script = """
         cat <<EOF > /usr/lib/tmpfiles.d/opt.conf
 # Add opt:
 L /opt - - - - /usr/opt
+EOF
+        cat <<EOF > /usr/lib/tmpfiles.d/opt.conf
+# Add opt:
+d /var/srv 0755 root root -
+d /var/srv/ftp 0755 root root -
+d /var/srv/http 0755 root root -
+L /srv - - - - /var/srv
 EOF
 
         # polish away files that make no sense in an immutable setup (or are handled by us!)
@@ -91,5 +100,5 @@ EOF
     _ensure_man_pages
     _ensure_no_unused_shell_files
 
-    export_root_fs
+    export_verity_image
 """

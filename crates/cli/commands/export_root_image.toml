@@ -1,0 +1,22 @@
+[command]
+help = """
+Export the entire root fs into one filesystem image
+"""
+
+script = """
+    export_root_fs on
+
+    if [ "${CURRENT_PHASE}" = "${PHASE_BUILD_ARTIFACTS}" ]; then
+        test -x /usr/bin/mkfs.erofs || error "mkfs.erofs not found"
+
+        root_image="${ARTIFACT_DIR}/root.img"
+
+        /usr/bin/mkfs.erofs \
+            -L "root-${version}" \
+            -T0 \
+            --ignore-mtime \
+            "${ARTIFACT_DIR}/root.img" "${ARTIFACT_ROOT_FS}"
+
+        export_constant "ARTIFACT_ROOT_IMAGE" "${root_image}"
+    fi
+"""
