@@ -12,10 +12,11 @@ script = """
         root_image="${ARTIFACT_DIR}/root.img"
 
         /usr/bin/mkfs.erofs \
-            -L "root-${version}" \
+            -L "${VERSION}" \
             -T0 \
             --ignore-mtime \
-            "${ARTIFACT_DIR}/root.img" "${ARTIFACT_ROOT_FS}"
+            --quiet \
+            "${root_image}" "${ARTIFACT_ROOT_FS}"
 
         export_constant "ARTIFACT_ROOT_IMAGE" "${root_image}"
     fi

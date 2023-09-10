@@ -11,8 +11,16 @@ script = """
 
         vrty_image="${ARTIFACT_DIR}/vrty.img"
 
-        /usr/bin/veritysetup format "${ARTIFACT_ROOT_IMAGE}" "${vrty_image}"
+        output=$(/usr/bin/veritysetup format "${ARTIFACT_ROOT_IMAGE}" "${vrty_image}")
+
+        root_hash=$(echo "${output}" | "${BUSYBOX}" grep "^Root hash:" | "${BUSYBOX}" sed "s/Root hash:\\s\\+//")
+        uuid=$(echo "${output}" | "${BUSYBOX}" grep "^UUID:" | "${BUSYBOX}" sed "s/UUID:\\s\\+//")
+
+        test -z "${root_hash}" && error "Failed to extract root hash from veritysetup output"
+        test -z "${uuid}" && error "Failed to extract uuid from veritysetup output"
 
         export_constant "ARTIFACT_VRTY_IMAGE" "${vrty_image}"
+        export_constant "ARTIFACT_VRTY_ROOT_HASH" "${root_hash}"
+        export_constant "ARTIFACT_VRTY_UUID" "${uuid}"
     fi
 """

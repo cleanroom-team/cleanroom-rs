@@ -9,12 +9,17 @@ script = """
         add_packages "${package_name-linux}" --assume-installed=initramfs
 
         if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
-           kernel_version=$(cd /usr/lib/modules && ls | sort | tail -n1)
-           kernel_path="/usr/lib/modules/${kernel_version}/vmlinuz"
-           test -e "${kernel_path}" || error "Kernel not found at ${kernel_path}"
+           if [ -d "${ROOT_FS}/usr/lib/modules" ]; then
+              kernel_version=$(cd "${ROOT_FS}/usr/lib/modules" && ls | sort | tail -n1)
+              kernel_path="${ROOT_FS}/usr/lib/modules/${kernel_version}/vmlinuz"
+              test -e "${kernel_path}" || error "Kernel not found at ${kernel_path}"
 
-           export_constant KERNEL_VERSION "${kernel_version}"
-           export_constant KERNEL_PATH "${kernel_path}"
+              export_constant KERNEL_VERSION "${kernel_version}"
+              mv "${kernel_path}" "${ARTIFACT_DIR}/vmlinuz"
+              export_constant KERNEL_PATH "${ARTIFACT_DIR}/vmlinuz"
+           else
+              error "No /usr/lib/modules directory: Can not find kernel I asked to install"
+           fi
         fi
     else
        error "Unknown base distribution id ${distribution_id} is not supported by pkg_kernel"

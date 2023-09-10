@@ -23,12 +23,11 @@ script = """
         export_constant HOST_NAME "${host_name}"
         export_constant PRETTY_HOST_NAME "${pretty_name}"
         export_constant MACHINE_ID "${machine_id}"
-    fi
-
-    _distribution "${distribution}"
-
-
-    if [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
+    elif [ "${CURRENT_PHASE}" = "${PHASE_BUILD_ARTIFACTS}" ]; then
+        test -z "${ARTIFACTS_FS}" && error "ARTIFACTS_FS is not set"
+        export_constant ARTIFACT_DIR "${ARTIFACTS_FS}/${host_name}/${VERSION}"
+        bb_mkdir -p "${ARTIFACT_DIR}"
+    elif [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
         cat <<EOF > /etc/machine.info
 PRETTY_HOSTNAME="${pretty_name}"
 CHASSIS="${chassis-desktop}"
@@ -38,4 +37,6 @@ EOF
         echo "${host_name}" > /etc/hostname
         echo "${machine_id}" > /etc/machine-id
     fi
+
+    _distribution "${distribution}"
 """

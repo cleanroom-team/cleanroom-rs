@@ -88,7 +88,9 @@ EOF
 
         rm -rf \
             /etc/kernel \
+            /etc/udev/hwdb.d \
             /usr/lib/kernel \
+            /usr/lib/udev/hwdb.d \
             /usr/lib/systemd/system/system-update.* \
             /usr/lib/sysusers.d \
             /usr/share/factory/etc/* \

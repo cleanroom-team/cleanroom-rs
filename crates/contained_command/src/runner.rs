@@ -380,7 +380,7 @@ impl<RT: Clone + std::fmt::Debug + Runtime> Runner<RT> {
         self
     }
 
-    /// Share users with the container
+    /// Make the root persist
     #[must_use]
     pub fn persistent_root(mut self) -> Self {
         self.container_data.persistent_root = true;

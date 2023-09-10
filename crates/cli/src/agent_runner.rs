@@ -68,6 +68,7 @@ fn run_in_bootstrap(phase: &Phases) -> bool {
 fn mount_artifacts_directory(phase: &Phases) -> bool {
     phase == &Phases::BuildArtifacts || phase == &Phases::TestArtifacts
 }
+
 fn mount_root_fs(phase: &Phases) -> bool {
     phase != &Phases::TestArtifacts
 }
@@ -79,6 +80,7 @@ fn create_runner(
     extra_bindings: &[String],
 ) -> anyhow::Result<Runner<contained_command::Nspawn>> {
     let p = ctx.printer();
+    let artifacts_fs = "/tmp/clrm/artifacts_fs";
 
     p.h2(&format!("Create \"{phase}\""), true);
     let agent_script =
@@ -99,15 +101,6 @@ fn create_runner(
                 ))
                 .env("ROOT_FS", "/tmp/clrm/root_fs")
         }
-        if mount_artifacts_directory(phase) {
-            runner = runner
-                .binding(Binding::rw(
-                    &ctx.artifacts_directory().unwrap(),
-                    &PathBuf::from("/tmp/clrm/artifacts_fs"),
-                ))
-                .env("ARTIFACTS_FS", "/tmp/clrm/artifacts_fs")
-        }
-
         runner
     } else {
         flags.push("ROOT");
@@ -148,6 +141,16 @@ fn create_runner(
         let binding =
             Binding::try_from(extra.as_str()).context("Failed to apply extra arguments")?;
         runner = runner.binding(binding);
+    }
+
+    if mount_artifacts_directory(phase) {
+        flags.push("ARTIFACTS");
+        runner = runner
+            .binding(Binding::rw(
+                &ctx.artifacts_directory().unwrap(),
+                &PathBuf::from(artifacts_fs),
+            ))
+            .env("ARTIFACTS_FS", artifacts_fs)
     }
 
     p.h2(
