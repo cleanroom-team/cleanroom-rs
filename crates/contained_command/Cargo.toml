@@ -2,6 +2,7 @@
 name = "contained_command"
 description = "Run a command inside a container"
 version = "0.1.0"
+edition = "2021"
 
 [dependencies]
 util = { path = "../util" }

@@ -20,7 +20,7 @@ struct Arguments {
     command: Commands,
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Clone, Debug)]
 struct ExtraCommandPath {
     /// Extends the default lookup path for commands. Later directories can
     /// overwrite commands in earlier directories.
@@ -78,7 +78,7 @@ struct InitializeCommand {
     directory: PathBuf,
 }
 
-#[derive(Args, Debug)]
+#[derive(Args, Clone, Debug)]
 struct BuildCommand {
     /// The directory to create temporary files in
     #[arg(long, default_value = "./work", env = "CLRM_WORK_DIR")]
@@ -219,7 +219,7 @@ fn create_printer(args: &Arguments) -> Rc<Printer> {
     Rc::new(printer)
 }
 
-#[tokio::main]
+#[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
     let args = Arguments::parse();
 
@@ -241,12 +241,11 @@ async fn main() -> anyhow::Result<()> {
         }
         Commands::Build(build) => {
             let printer = create_printer(&args);
+            let build = build.clone();
 
-            let mut ctx = create_build_context(printer.clone(), build)
+            let mut ctx = create_build_context(printer.clone(), &build)
                 .context("Failed to create system context")?;
 
-            let printer = ctx.printer();
-            printer.h1("Run agent", true);
             cli::agent_runner::run_build_agent(
                 &mut ctx,
                 &build.command,
@@ -254,8 +253,6 @@ async fn main() -> anyhow::Result<()> {
                 &build.extra_bindings,
             )
             .await
-            .context("Failed to drive agent")?;
-            Ok(())
         }
     }
 }
