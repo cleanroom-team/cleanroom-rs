@@ -5,3 +5,15 @@
 resolver = "2"
 
 members = ["crates/*"]
+
+[workspace.package]
+authors = [ "Tobias Hunger <tobias.hunger@gmail.com>" ]
+categories = [ "command-line-utilities" ]
+description = "A tool to build immutable linux images from normal packages"
+edition = "2021"
+homepage = "https://github.com/cleanroom-team/cleanroom-rs"
+keywords = [ "immutable", "linux", "distribution" ]
+license = "GPL-3.0-or-later"
+repository = "https://github.com/cleanroom-team/cleanroom-rs"
+rust-version = "1.72"
+version = "0.1.0"
