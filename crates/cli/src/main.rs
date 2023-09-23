@@ -165,7 +165,7 @@ fn create_command_manager(
 }
 
 fn create_build_context(
-    printer: Printer,
+    printer: Rc<Printer>,
     run: &BuildCommand,
 ) -> anyhow::Result<cli::context::BuildContext> {
     let base_ctx = {
@@ -193,7 +193,7 @@ fn create_build_context(
     let ctx = base_ctx
         .create_run_context(
             create_command_manager(&run.extra_command_path)?,
-            Rc::new(printer),
+            printer,
             &run.work_directory,
             &run.artifacts_directory,
             &run.busybox_binary,
@@ -205,6 +205,18 @@ fn create_build_context(
         .context("Failed to set up system context")?;
 
     Ok(ctx)
+}
+
+fn create_printer(args: &Arguments) -> Rc<Printer> {
+    let printer = Printer::new(&args.log_level, true);
+
+    printer.h1("Setup", true);
+    printer.h2("Bootstrap", true);
+
+    printer.trace("Logging is set up and ready.");
+    printer.debug(&format!("Command line arguments: {args:?}"));
+
+    Rc::new(printer)
 }
 
 #[tokio::main]
@@ -228,16 +240,10 @@ async fn main() -> anyhow::Result<()> {
             cli::init::initialize(&init.busybox_binary, &init.distribution, &init.directory)
         }
         Commands::Build(build) => {
-            let printer = Printer::new(&args.log_level, true);
+            let printer = create_printer(&args);
 
-            printer.h1("Setup", true);
-            printer.h2("Bootstrap", true);
-
-            printer.trace("Logging is set up and ready.");
-            printer.debug(&format!("Command line arguments: {args:?}"));
-
-            let mut ctx =
-                create_build_context(printer, build).context("Failed to create system context")?;
+            let mut ctx = create_build_context(printer.clone(), build)
+                .context("Failed to create system context")?;
 
             let printer = ctx.printer();
             printer.h1("Run agent", true);
