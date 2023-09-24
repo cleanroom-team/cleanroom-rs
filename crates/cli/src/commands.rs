@@ -24,13 +24,86 @@ fn validate_command_name(name: &str) -> anyhow::Result<()> {
     }
 }
 
+fn validate_variable_name(name: &str) -> anyhow::Result<()> {
+    if name
+        .chars()
+        .take(1)
+        .all(|c| c.is_ascii_alphabetic() || c == '_')
+        && name
+            .chars()
+            .skip(1)
+            .all(|c| c.is_ascii_alphanumeric() || c == '_')
+    {
+        Ok(())
+    } else {
+        Err(anyhow!("Invalid command name {name}"))
+    }
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, serde::Deserialize)]
+pub struct CommandName(String);
+
+impl TryFrom<String> for CommandName {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        validate_command_name(&value).context(format!("{value} is not a valid command name"))?;
+        Ok(CommandName(value))
+    }
+}
+
+impl TryFrom<&Path> for CommandName {
+    type Error = anyhow::Error;
+
+    fn try_from(value: &Path) -> Result<Self, Self::Error> {
+        let name: CommandName = value
+            .file_stem()
+            .context(format!("No file stem in {value:?}"))?
+            .to_string_lossy()
+            .to_string()
+            .try_into()?;
+        Ok(name)
+    }
+}
+
+impl std::fmt::Display for CommandName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl CommandName {
+    pub fn parse_value(value: &str) -> anyhow::Result<Self> {
+        validate_command_name(value)?;
+        Ok(Self(value.to_string()))
+    }
+}
+
+#[derive(Clone, Debug, Eq, Ord, PartialEq, PartialOrd, serde::Deserialize)]
+pub struct VariableName(String);
+
+impl TryFrom<String> for VariableName {
+    type Error = anyhow::Error;
+
+    fn try_from(value: String) -> Result<Self, Self::Error> {
+        validate_variable_name(&value).context(format!("{value} is not a valid variable name"))?;
+        Ok(VariableName(value))
+    }
+}
+
+impl std::fmt::Display for VariableName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
 /// Meta-information about an `Input`
 #[derive(Clone, Debug, serde::Deserialize)]
 #[serde(untagged)]
 pub enum Input {
-    Basic(String),
+    Basic(VariableName),
     Full {
-        name: String,
+        name: VariableName,
         help: Option<String>,
         #[serde(default)]
         optional: bool,
@@ -38,7 +111,7 @@ pub enum Input {
 }
 
 impl Input {
-    pub fn name(&self) -> String {
+    pub fn name(&self) -> VariableName {
         match self {
             Input::Basic(name) => name.clone(),
             Input::Full { name, .. } => name.clone(),
@@ -82,7 +155,7 @@ pub struct Command {
 
     /// The definition this command overwrites
     #[serde(skip)]
-    overwrote_definition_in: Option<String>,
+    overwrote_definition_in: Vec<String>,
 }
 
 impl Command {
@@ -115,8 +188,13 @@ impl std::fmt::Display for Command {
                 writeln!(f, "    {}{}", i.name(), help)?
             }
         }
-        if let Some(overwrote) = &self.overwrote_definition_in {
-            writeln!(f, "  *** Overwrote definition in {overwrote} ***")?;
+        let overwrote = &self.overwrote_definition_in;
+        if !overwrote.is_empty() {
+            writeln!(
+                f,
+                "  *** Overwrote definition in {} ***",
+                overwrote.join(", ")
+            )?;
         }
         writeln!(f)
     }
@@ -151,7 +229,7 @@ impl TomlCommand {
 
 #[derive(Clone, Debug)]
 pub struct CommandManagerBuilder {
-    commands: BTreeMap<String, Command>,
+    commands: BTreeMap<CommandName, Command>,
 }
 
 impl Default for CommandManagerBuilder {
@@ -163,7 +241,7 @@ impl Default for CommandManagerBuilder {
         // Add builtin commands:
         for f in BUILTIN_COMMANDS_DIR.files() {
             let contents = f.contents_utf8().unwrap();
-            let name = f.path().file_stem().unwrap().to_string_lossy().to_string();
+            let name = CommandName::try_from(f.path()).unwrap();
 
             let cmd = TomlCommand::from_str(contents, "<builtin>").unwrap();
             result.commands.insert(name, cmd);
@@ -191,11 +269,15 @@ impl CommandManagerBuilder {
                 let mut cmd = TomlCommand::read_from_file(&p)
                     .context(format!("Failed to read command from {p:?}"))?;
 
-                let name = p.file_stem().unwrap().to_string_lossy().to_string();
-                validate_command_name(&name)?;
+                let name = CommandName::try_from(&p as &Path)?;
 
                 if let Some(old) = self.commands.get(&name) {
-                    cmd.overwrote_definition_in = Some(old.source_location.clone());
+                    cmd.overwrote_definition_in = old
+                        .overwrote_definition_in
+                        .iter()
+                        .cloned()
+                        .chain(std::iter::once(&old.source_location).cloned())
+                        .collect();
                 }
 
                 self.commands.insert(name, cmd);
@@ -207,11 +289,11 @@ impl CommandManagerBuilder {
 
 #[derive(Clone, Debug)]
 pub struct CommandManager {
-    commands: BTreeMap<String, Command>,
+    commands: BTreeMap<CommandName, Command>,
 }
 
 impl CommandManager {
-    pub fn command(&self, name: &str) -> anyhow::Result<&Command> {
+    pub fn command(&self, name: &CommandName) -> anyhow::Result<&Command> {
         if let Some(command) = self.commands.get(name) {
             Ok(command)
         } else {
@@ -219,7 +301,7 @@ impl CommandManager {
         }
     }
 
-    pub fn commands(&self) -> impl Iterator<Item = (&String, &Command)> {
+    pub fn commands(&self) -> impl Iterator<Item = (&CommandName, &Command)> {
         self.commands.iter()
     }
 
@@ -246,7 +328,7 @@ impl CommandManager {
         result
     }
 
-    pub fn show_command(&self, name: &str) -> anyhow::Result<String> {
+    pub fn show_command(&self, name: &CommandName) -> anyhow::Result<String> {
         let Some(command) = self.commands.get(name) else {
             return Err(anyhow::anyhow!("Unknown command: {name}"));
         };

@@ -6,6 +6,7 @@ use std::path::PathBuf;
 
 use anyhow::Context;
 
+use crate::commands::CommandName;
 use crate::context::BuildContext;
 
 struct Section {
@@ -121,9 +122,9 @@ fn script_add_pre_command() -> Section {
     section
 }
 
-fn script_add_command(start_command: &str) -> Section {
+fn script_add_command(start_command: &CommandName) -> Section {
     let mut section = Section::new("command");
-    section.push_str(start_command);
+    section.push_str(&start_command.to_string());
     section
 }
 
@@ -133,7 +134,7 @@ fn script_add_footer() -> Section {
     section
 }
 
-pub fn create_script(ctx: &BuildContext, start_command: &str) -> anyhow::Result<PathBuf> {
+pub fn create_script(ctx: &BuildContext, start_command: &CommandName) -> anyhow::Result<PathBuf> {
     let p = ctx.printer();
     let script_path = ctx.scratch_directory().join("script.sh");
 

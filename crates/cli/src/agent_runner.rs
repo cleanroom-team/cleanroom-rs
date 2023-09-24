@@ -1,7 +1,7 @@
 // Copyright © Tobias Hunger <tobias.hunger@gmail.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::{context::BuildContext, Phases};
+use crate::{commands::CommandName, context::BuildContext, Phases};
 
 use anyhow::Context;
 use contained_command::{Binding, Command, Nspawn, RunEnvironment, Runner};
@@ -80,7 +80,7 @@ fn mount_root_fs(phase: &Phases) -> bool {
 
 fn create_runner(
     ctx: &BuildContext,
-    command: &str,
+    command: &CommandName,
     phase: &Phases,
     extra_bindings: &[String],
 ) -> anyhow::Result<Runner<contained_command::Nspawn>> {
@@ -164,7 +164,7 @@ fn create_runner(
 #[allow(clippy::needless_pass_by_ref_mut)] // FIXME: It's not useless: It's passed on to parse_stdout!
 pub async fn enter_agent_phase(
     ctx: &mut BuildContext,
-    command: &str,
+    command: &CommandName,
     phase: &Phases,
     extra_bindings: &[String],
 ) -> anyhow::Result<()> {
@@ -203,7 +203,7 @@ pub async fn enter_agent_phase(
 #[allow(clippy::needless_pass_by_ref_mut)] // FIXME: It's not useless: It's passed on to parse_stdout!
 pub async fn run_agent_phase(
     ctx: &mut BuildContext,
-    command: &str,
+    command: &CommandName,
     phase: &Phases,
     extra_bindings: &[String],
 ) -> anyhow::Result<()> {
@@ -248,7 +248,7 @@ pub async fn run_agent_phase(
 #[allow(clippy::needless_pass_by_ref_mut)] // FIXME: It's not useless: It's passed on to run_agent_phase
 pub async fn run_build_agent(
     ctx: &mut BuildContext,
-    command: &str,
+    command: &CommandName,
     enter_phase: &Option<Phases>,
     extra_bindings: &[String],
 ) -> anyhow::Result<()> {

@@ -6,7 +6,7 @@ use std::{path::PathBuf, rc::Rc};
 use anyhow::Context;
 use clap::{Args, Parser, Subcommand};
 
-use cli::{printer::Printer, DebugOptions};
+use cli::{commands::CommandName, printer::Printer, DebugOptions};
 
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
@@ -59,7 +59,8 @@ struct CommandListCommand {
 #[derive(Args, Debug)]
 struct DumpCommand {
     /// The command to dump
-    name: String,
+    #[arg(value_parser = CommandName::parse_value)]
+    name: CommandName,
 
     #[command(flatten)]
     extra_command_path: ExtraCommandPath,
@@ -128,7 +129,8 @@ struct BuildCommand {
     enter_phase: Option<cli::Phases>,
 
     /// The commands to run
-    command: String,
+    #[arg(value_parser = CommandName::parse_value)]
+    command: CommandName,
 
     #[arg(long, env = "CLRM_TRACE_SCRIPT", value_delimiter = ',', hide = true)]
     debug_options: Option<Vec<cli::DebugOptions>>,
