@@ -193,7 +193,7 @@ fn create_build_context(
     };
 
     let ctx = base_ctx
-        .create_run_context(
+        .create_build_context(
             create_command_manager(&run.extra_command_path)?,
             printer,
             &run.work_directory,
