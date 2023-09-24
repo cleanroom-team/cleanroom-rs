@@ -289,6 +289,7 @@ impl Runtime for Nspawn {
 
 #[derive(Clone, Debug)]
 pub struct ContainerData {
+    description: String,
     machine_id: Option<[u8; 32]>,
     bindings: Vec<crate::Binding>,
     environment: Vec<(OsString, OsString)>,
@@ -312,6 +313,7 @@ impl<RT: Clone + std::fmt::Debug + Runtime> Runner<RT> {
         Runner {
             runtime,
             container_data: ContainerData {
+                description: String::default(),
                 machine_id: None,
                 environment: Vec::new(),
                 bindings: Vec::new(),
@@ -321,6 +323,18 @@ impl<RT: Clone + std::fmt::Debug + Runtime> Runner<RT> {
                 persistent_root: false,
             },
         }
+    }
+
+    /// Set the `machine_id` of the container
+    #[must_use]
+    pub fn description(mut self, description: String) -> Self {
+        self.container_data.description = description;
+        self
+    }
+
+    /// Describe the runner based on some user provided description
+    pub fn describe(&self) -> &str {
+        &self.container_data.description
     }
 
     /// Set the `machine_id` of the container

@@ -210,12 +210,12 @@ fn create_build_context(
 fn create_printer(args: &Arguments) -> Rc<Printer> {
     let printer = Printer::new(&args.log_level, true);
 
-    printer.h1("Setup", true);
-    printer.h2("Bootstrap", true);
+    {
+        let _headline = printer.push_headline("Bootstrap", true);
 
-    printer.trace("Logging is set up and ready.");
-    printer.debug(&format!("Command line arguments: {args:?}"));
-
+        printer.trace("Logging is set up and ready.");
+        printer.debug(&format!("Command line arguments: {args:?}"));
+    }
     Rc::new(printer)
 }
 

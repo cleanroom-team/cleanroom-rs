@@ -16,7 +16,12 @@ const DEFAULT_MACHINE_ID: [u8; 32] = [
     b'9', b'7', b'e', b'1', b'd', b'f', b'5', b'e', b'b', b'3', b'b', b'2', b'6', b'4', b'2', b'2',
 ];
 
-fn parse_stdout(m: &str, command_prefix: &str, ctx: &mut BuildContext) -> bool {
+fn parse_stdout(
+    m: &str,
+    command_prefix: &str,
+    ctx: &mut BuildContext,
+    current_status: &mut Option<crate::printer::Headline>,
+) -> bool {
     let p = ctx.printer();
     let Some(cmd) = m.strip_prefix(command_prefix) else {
         return false;
@@ -49,7 +54,7 @@ fn parse_stdout(m: &str, command_prefix: &str, ctx: &mut BuildContext) -> bool {
         }
     } else if let Some(status) = cmd.strip_prefix("STATUS ") {
         let status = status.trim().trim_matches('"');
-        ctx.printer().h3(status, true);
+        *current_status = Some(ctx.printer().push_headline(status, true));
     } else if let Some(status) = cmd.strip_prefix("PUSH ") {
         let status = status.trim().trim_matches('"');
         ctx.printer().push_status(status);
@@ -82,7 +87,7 @@ fn create_runner(
     let p = ctx.printer();
     let artifacts_fs = "/tmp/clrm/artifacts_fs";
 
-    p.h2(&format!("Create \"{phase}\""), true);
+    let _hl = p.push_headline(&format!("Create \"{phase}\""), true);
     let agent_script =
         crate::scripts::create_script(ctx, command).context("Failed to create agent script")?;
 
@@ -153,12 +158,7 @@ fn create_runner(
             .env("ARTIFACTS_FS", artifacts_fs)
     }
 
-    p.h2(
-        &format!("Running \"{phase}\" [{}]", flags.join(", ")),
-        false,
-    );
-
-    Ok(runner)
+    Ok(runner.description(flags.join(", ").to_string()))
 }
 
 #[allow(clippy::needless_pass_by_ref_mut)] // FIXME: It's not useless: It's passed on to parse_stdout!
@@ -169,8 +169,11 @@ pub async fn enter_agent_phase(
     extra_bindings: &[String],
 ) -> anyhow::Result<()> {
     let p = ctx.printer();
-    p.h2("Enter container in phase \"{phase}\"", false);
     let runner = create_runner(ctx, command, phase, extra_bindings)?.with_network();
+    let _hl = p.push_headline(
+        &format!("Enter container in \"{phase}\" [{}]", runner.describe()),
+        false,
+    );
 
     let command = {
         let mut command = Command::new("/tmp/clrm/busybox");
@@ -206,6 +209,10 @@ pub async fn run_agent_phase(
 ) -> anyhow::Result<()> {
     let p = ctx.printer();
     let runner = create_runner(ctx, command, phase, extra_bindings)?;
+    let _hl = p.push_headline(
+        &format!("Running container in \"{phase}\" [{}]", runner.describe()),
+        false,
+    );
 
     let command_prefix = uuid::Uuid::new_v4().to_string();
     let command = {
@@ -217,20 +224,23 @@ pub async fn run_agent_phase(
     };
 
     let command_prefix = format!("{command_prefix}: ");
-    runner
-        .run(
-            &command,
-            &|m| p.trace(m),
-            &|m| p.error(m),
-            &mut |m| {
-                if !parse_stdout(m, &command_prefix, ctx) {
-                    p.print_stdout(m);
-                }
-            },
-            &mut |m| p.print_stderr(m),
-        )
-        .await
-        .context("Failed to containerize")?;
+    {
+        let mut current_status = None;
+        runner
+            .run(
+                &command,
+                &|m| p.trace(m),
+                &|m| p.error(m),
+                &mut |m| {
+                    if !parse_stdout(m, &command_prefix, ctx, &mut current_status) {
+                        p.print_stdout(m);
+                    }
+                },
+                &mut |m| p.print_stderr(m),
+            )
+            .await
+            .context("Failed to containerize")?;
+    }
 
     Ok(())
 }
@@ -243,7 +253,7 @@ pub async fn run_build_agent(
     extra_bindings: &[String],
 ) -> anyhow::Result<()> {
     let p = ctx.printer();
-    p.h1("Run Agent", true);
+    let _hl = p.push_headline("Run Agent", true);
 
     for phase in Phases::iter() {
         if ctx.check_debug_option(&crate::DebugOptions::PrintRunContext) {
@@ -277,8 +287,10 @@ mod tests {
         ctx.set("FOO", "bar", false, false).unwrap();
         ctx.set("BAR", "foo", false, false).unwrap();
 
+        let mut current_headline = None;
+
         assert_eq!(
-            parse_stdout(input, command_prefix, &mut ctx),
+            parse_stdout(input, command_prefix, &mut ctx, &mut current_headline),
             expect_handled
         );
 
