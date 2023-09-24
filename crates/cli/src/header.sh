@@ -45,8 +45,15 @@ export_var() {
 	key="${1}"
 	shift
 
-	eval "${key}=\"${*}\""
 	echo "${__command_prefix}: SET \"${key}\"=\"${*}\""
+}
+
+add_dependency() {
+	key="${1}"
+	shift
+
+	eval "${key}=\"${*}\""
+	echo "${__command_prefix}: ADD_DEPENDENCY \"${key}\"=\"${*}\""
 }
 
 error() {

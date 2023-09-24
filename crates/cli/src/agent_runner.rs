@@ -1,9 +1,13 @@
 // Copyright © Tobias Hunger <tobias.hunger@gmail.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use crate::{commands::CommandName, context::BuildContext, Phases};
+use crate::{
+    commands::{CommandName, VariableName},
+    context::BuildContext,
+    Phases,
+};
 
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use contained_command::{Binding, Command, Nspawn, RunEnvironment, Runner};
 
 use std::{ffi::OsString, path::PathBuf};
@@ -16,43 +20,82 @@ const DEFAULT_MACHINE_ID: [u8; 32] = [
     b'9', b'7', b'e', b'1', b'd', b'f', b'5', b'e', b'b', b'3', b'b', b'2', b'6', b'4', b'2', b'2',
 ];
 
+fn handle_set(cmd: &str, ctx: &mut BuildContext) -> anyhow::Result<bool> {
+    let Some(to_set) = cmd.strip_prefix("SET ") else {
+        return Ok(false);
+    };
+
+    let Some((k, v)) = to_set.split_once('=') else {
+        return Err(anyhow!(format!(
+            "Could not parse arguments after SET: No '=' found in {to_set:?}"
+        )));
+    };
+
+    let k = k.trim().trim_matches('"');
+    let v = v.trim().trim_matches('"');
+    ctx.set(k, v, false, false)
+        .context(format!("Failed fo SET {k} to {v}"))?;
+
+    Ok(true)
+}
+
+fn handle_set_ro(cmd: &str, ctx: &mut BuildContext) -> anyhow::Result<bool> {
+    let Some(to_set) = cmd.strip_prefix("SET_RO ") else {
+        return Ok(false);
+    };
+
+    let Some((k, v)) = to_set.split_once('=') else {
+        return Err(anyhow!(format!(
+            "Could not parse arguments after SET: No '=' found in {to_set:?}"
+        )));
+    };
+
+    let k = k.trim().trim_matches('"');
+    let v = v.trim().trim_matches('"');
+    ctx.set(k, v, true, false)
+        .context(format!("Failed fo SET_RO {k} to {v}"))?;
+
+    Ok(true)
+}
+
+fn handle_add_dependency(cmd: &str, ctx: &mut BuildContext) -> anyhow::Result<bool> {
+    let Some(to_set) = cmd.strip_prefix("ADD_DEPENDENCY ") else {
+        return Ok(false);
+    };
+
+    let Some((k, v)) = to_set.split_once('=') else {
+        return Err(anyhow!(format!(
+            "Could not parse arguments after ADD_DEPENDENCY: No '=' found in {to_set:?}"
+        )));
+    };
+
+    let key = VariableName::try_from(k.trim().trim_matches('"').to_string())
+        .context(format!("Could not convert {k} to variable name"))?;
+    let value = CommandName::try_from(v.trim().trim_matches('"').to_string())
+        .context(format!("Could not convert {v} to command name"))?;
+    ctx.add_dependency(key.clone(), value.clone())
+        .context(format!("Failed to ADD_DEPENDENCY {key} using {value}"))?;
+
+    Ok(true)
+}
+
 fn parse_stdout(
     m: &str,
     command_prefix: &str,
     ctx: &mut BuildContext,
     current_status: &mut Option<crate::printer::Headline>,
-) -> bool {
+) -> anyhow::Result<bool> {
     let p = ctx.printer();
     let Some(cmd) = m.strip_prefix(command_prefix) else {
-        return false;
+        return Ok(false);
     };
 
     p.trace(&format!("Processing {}", cmd));
-    if let Some(to_set) = cmd.strip_prefix("SET ") {
-        if let Some((k, v)) = to_set.split_once('=') {
-            let k = k.trim().trim_matches('"');
-            let v = v.trim().trim_matches('"');
-            if let Err(e) = ctx.set(k, v, false, false) {
-                p.error(&format!("Could not parse arguments after SET {k}: {e}"));
-            }
-        } else {
-            p.error(&format!(
-                "Could not parse arguments after SET: No '=' found in {to_set:?}"
-            ));
-        }
-    } else if let Some(to_set) = cmd.strip_prefix("SET_RO ") {
-        if let Some((k, v)) = to_set.split_once('=') {
-            let k = k.trim().trim_matches('"');
-            let v = v.trim().trim_matches('"');
-            if let Err(e) = ctx.set(k, v, true, false) {
-                p.error(&format!("Could not parse arguments after SET_RO {k}: {e}"));
-            }
-        } else {
-            p.error(&format!(
-                "Could not parse arguments after SET: No '=' found in {to_set:?}"
-            ));
-        }
-    } else if let Some(status) = cmd.strip_prefix("STATUS ") {
+    if handle_set(cmd, ctx)? || handle_set_ro(cmd, ctx)? || handle_add_dependency(cmd, ctx)? {
+        return Ok(true);
+    }
+
+    if let Some(status) = cmd.strip_prefix("STATUS ") {
         let status = status.trim().trim_matches('"');
         *current_status = Some(ctx.printer().push_headline(status, true));
     } else if let Some(status) = cmd.strip_prefix("PUSH ") {
@@ -61,9 +104,12 @@ fn parse_stdout(
     } else if cmd == "POP" {
         ctx.printer().pop_status();
     } else {
-        p.error(&format!("Agent asked to process unknown command {cmd:?}"))
+        return Err(anyhow!(format!(
+            "Agent asked to process unknown command {cmd:?}"
+        )));
     }
-    true
+
+    Ok(true)
 }
 
 fn run_in_bootstrap(phase: &Phases) -> bool {
@@ -196,7 +242,7 @@ pub async fn enter_agent_phase(
     if result.success() {
         Ok(())
     } else {
-        Err(anyhow::anyhow!("Container was not terminated successfully"))
+        Err(anyhow!("Container was not terminated successfully"))
     }
 }
 
@@ -232,9 +278,11 @@ pub async fn run_agent_phase(
                 &|m| p.trace(m),
                 &|m| p.error(m),
                 &mut |m| {
-                    if !parse_stdout(m, &command_prefix, ctx, &mut current_status) {
-                        p.print_stdout(m);
-                    }
+                    match parse_stdout(m, &command_prefix, ctx, &mut current_status) {
+                        Ok(true) => {}
+                        Ok(false) => p.print_stdout(m),
+                        Err(e) => p.error(&format!("Failed to parse stdout: {e:?}")),
+                    };
                 },
                 &mut |m| p.print_stderr(m),
             )
@@ -256,13 +304,18 @@ pub async fn run_build_agent(
     let _hl = p.push_headline("Run Agent", true);
 
     for phase in Phases::iter() {
-        if ctx.check_debug_option(&crate::DebugOptions::PrintRunContext) {
+        if ctx.check_debug_option(&crate::DebugOptions::PrintBuildContext) {
             p.debug(&format!("RunContext in {phase} is:\n{ctx}"));
         }
         if enter_phase.as_ref() == Some(phase) {
             return enter_agent_phase(ctx, command, phase, extra_bindings).await;
         } else {
             run_agent_phase(ctx, command, phase, extra_bindings).await?;
+            let dependencies = ctx.take_dependencies();
+
+            for (name, command) in dependencies {
+                println!("Dependencies after phase {phase}: {name} => {command}");
+            }
         }
     }
 

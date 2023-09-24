@@ -10,8 +10,8 @@ pub enum DebugOptions {
     PrintAgentScript,
     /// Trace the agent scripts execution
     TraceAgentScript,
-    /// Print the run context to debug output as we enter a new phase
-    PrintRunContext,
+    /// Print the build context to debug output as we enter a new phase
+    PrintBuildContext,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq, ValueEnum)]

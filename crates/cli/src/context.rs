@@ -3,6 +3,7 @@
 
 //! The `Context` to run in
 
+use crate::commands::{CommandName, VariableName};
 #[cfg(test)]
 use crate::printer::{LogLevel, Printer};
 
@@ -196,6 +197,7 @@ pub struct BuildContext {
     networked_phases: Vec<crate::Phases>,
     scratch_dir: tempfile::TempDir,
     debug_options: Vec<crate::DebugOptions>,
+    dependencies: Vec<(VariableName, CommandName)>,
 }
 
 const ARTIFACTS_DIR: &str = "ARTIFACTS_DIR";
@@ -224,6 +226,7 @@ impl Context {
             networked_phases: Vec::default(),
             scratch_dir: tempfile::TempDir::new().unwrap(),
             debug_options: vec![],
+            dependencies: vec![],
         };
 
         ctx.set(BUSYBOX_BINARY, "/usr/bin/busybox", true, true)
@@ -298,6 +301,7 @@ impl Context {
             networked_phases,
             scratch_dir,
             debug_options,
+            dependencies: Default::default(),
         };
 
         ctx.set_raw(BUSYBOX_BINARY, busybox_binary.as_os_str(), true, true)
@@ -366,6 +370,26 @@ impl std::fmt::Display for BuildContext {
 }
 
 impl BuildContext {
+    // Dependency management:
+    pub fn take_dependencies(&mut self) -> Vec<(VariableName, CommandName)> {
+        std::mem::take(&mut self.dependencies)
+    }
+
+    // Add a new dependency
+    pub(crate) fn add_dependency(
+        &mut self,
+        key: VariableName,
+        value: CommandName,
+    ) -> anyhow::Result<()> {
+        eprintln!("ADD_DEPENDENCY: {key} => {value}");
+        if self.dependencies.iter().any(|(k, _)| k == &key) {
+            return Err(anyhow!("{key} already registered as a dependency"));
+        }
+        self.dependencies.push((key, value));
+
+        Ok(())
+    }
+
     // Getters:
     pub fn bootstrap_environment(&self) -> &RunEnvironment {
         &self.bootstrap_environment
