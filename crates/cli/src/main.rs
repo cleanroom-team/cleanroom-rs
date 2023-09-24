@@ -1,7 +1,7 @@
 // Copyright © Tobias Hunger <tobias.hunger@gmail.com>
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-use std::{path::PathBuf, rc::Rc};
+use std::path::PathBuf;
 
 use anyhow::Context;
 use clap::{Args, Parser, Subcommand};
@@ -15,26 +15,19 @@ struct Arguments {
     /// Set the log level
     log_level: cli::printer::LogLevel,
 
+    /// Extends the default lookup path for commands. Later directories can
+    /// overwrite commands in earlier directories.
+    #[arg(
+        long,
+        env = "CLRM_EXTRA_COMMAND_PATH",
+        value_delimiter = ':',
+        default_value = "vec![]"
+    )]
+    extra_command_path: Vec<PathBuf>,
+
     /// The command to run
     #[command(subcommand)]
     command: Commands,
-}
-
-#[derive(Args, Clone, Debug)]
-struct ExtraCommandPath {
-    /// Extends the default lookup path for commands. Later directories can
-    /// overwrite commands in earlier directories.
-    #[arg(long, env = "CLRM_EXTRA_COMMAND_PATH", value_delimiter = ':')]
-    extra_command_path: Option<Vec<PathBuf>>,
-}
-
-impl std::ops::Deref for ExtraCommandPath {
-    type Target = Vec<PathBuf>;
-
-    fn deref(&self) -> &Self::Target {
-        static EMPTY: Vec<PathBuf> = Vec::new();
-        self.extra_command_path.as_ref().unwrap_or(&EMPTY)
-    }
 }
 
 #[derive(Args, Debug)]
@@ -51,9 +44,6 @@ struct CommandListCommand {
     /// Print more information
     #[arg(long)]
     verbose: bool,
-
-    #[command(flatten)]
-    extra_command_path: ExtraCommandPath,
 }
 
 #[derive(Args, Debug)]
@@ -61,9 +51,6 @@ struct DumpCommand {
     /// The command to dump
     #[arg(value_parser = CommandName::parse_value)]
     name: CommandName,
-
-    #[command(flatten)]
-    extra_command_path: ExtraCommandPath,
 }
 
 #[derive(Args, Debug)]
@@ -117,9 +104,6 @@ struct BuildCommand {
     #[arg(long, env = "CLRM_EXTRA_BINDINGS", value_delimiter = ',')]
     extra_bindings: Vec<String>,
 
-    #[command(flatten)]
-    extra_command_path: ExtraCommandPath,
-
     /// Enter a debug environment in the provided phase
     #[arg(long, env = "CLRM_NETWORKED_PHASES", value_delimiter = ',')]
     networked_phases: Vec<cli::Phases>,
@@ -167,11 +151,13 @@ fn create_command_manager(
 }
 
 fn create_build_context(
-    printer: Rc<Printer>,
+    printer: Printer,
     run: &BuildCommand,
+    extra_command_path: &[PathBuf],
 ) -> anyhow::Result<cli::context::BuildContext> {
     let base_ctx = {
-        let mut builder = cli::context::ContextBuilder::default();
+        let mut builder =
+            cli::context::ContextBuilder::new(printer, create_command_manager(extra_command_path)?);
         if let Some(ts) = &run.timestamp {
             builder = builder.timestamp(ts.clone())?;
         }
@@ -179,10 +165,8 @@ fn create_build_context(
             builder = builder.version(v.clone())?;
         }
 
-        builder.build()
+        builder.build()?
     };
-
-    let myself = std::env::current_exe().context("Failed to find current executable path")?;
 
     let bootstrap_environment =
         cli::RunEnvironment::new(&run.bootstrap_directory, &run.bootstrap_image)?;
@@ -194,12 +178,9 @@ fn create_build_context(
 
     let ctx = base_ctx
         .create_build_context(
-            create_command_manager(&run.extra_command_path)?,
-            printer,
             &run.work_directory,
             &run.artifacts_directory,
             &run.busybox_binary,
-            &myself,
             bootstrap_environment,
             &run.networked_phases,
             debug_options,
@@ -209,7 +190,7 @@ fn create_build_context(
     Ok(ctx)
 }
 
-fn create_printer(args: &Arguments) -> Rc<Printer> {
+fn create_printer(args: &Arguments) -> Printer {
     let printer = Printer::new(&args.log_level, true);
 
     {
@@ -218,7 +199,7 @@ fn create_printer(args: &Arguments) -> Rc<Printer> {
         printer.trace("Logging is set up and ready.");
         printer.debug(&format!("Command line arguments: {args:?}"));
     }
-    Rc::new(printer)
+    printer
 }
 
 #[tokio::main(flavor = "current_thread")]
@@ -228,12 +209,12 @@ async fn main() -> anyhow::Result<()> {
     match &args.command {
         Commands::BuildAgent(agent) => cli::agent::run(&agent.command_prefix, &agent.phase),
         Commands::CommandList(list) => {
-            let command_manager = create_command_manager(&list.extra_command_path)?;
+            let command_manager = create_command_manager(&args.extra_command_path)?;
             println!("{}", command_manager.list_commands(list.verbose));
             Ok(())
         }
         Commands::DumpCommand(dc) => {
-            let command_manager = create_command_manager(&dc.extra_command_path)?;
+            let command_manager = create_command_manager(&args.extra_command_path)?;
             let cmd = command_manager.command(&dc.name)?;
             println!("{}", cmd.dump_source());
             Ok(())
@@ -245,7 +226,7 @@ async fn main() -> anyhow::Result<()> {
             let printer = create_printer(&args);
             let build = build.clone();
 
-            let mut ctx = create_build_context(printer.clone(), &build)
+            let mut ctx = create_build_context(printer.clone(), &build, &args.extra_command_path)
                 .context("Failed to create system context")?;
 
             cli::agent_runner::run_build_agent(

@@ -293,7 +293,6 @@ pub async fn run_agent_phase(
     Ok(())
 }
 
-#[allow(clippy::needless_pass_by_ref_mut)] // FIXME: It's not useless: It's passed on to run_agent_phase
 pub async fn run_build_agent(
     ctx: &mut BuildContext,
     command: &CommandName,
@@ -314,7 +313,8 @@ pub async fn run_build_agent(
             let dependencies = ctx.take_dependencies();
 
             for (name, command) in dependencies {
-                println!("Dependencies after phase {phase}: {name} => {command}");
+                let _hl =
+                    p.push_headline(&format!("Building Dependency {name} => {command}"), true);
             }
         }
     }
@@ -324,8 +324,6 @@ pub async fn run_build_agent(
 
 #[cfg(test)]
 mod tests {
-    use crate::printer::LogLevel;
-
     use super::*;
 
     fn test_parse_stdout(
@@ -334,21 +332,21 @@ mod tests {
         expect_handled: bool,
         expect_error: bool,
     ) -> crate::context::BuildContext {
-        let ctx = crate::context::ContextBuilder::default().build();
-        let mut ctx = ctx.test_system(&LogLevel::Off);
+        let ctx = crate::context::ContextBuilder::new_test().build().unwrap();
+        let mut ctx = ctx.test_system();
 
         ctx.set("FOO", "bar", false, false).unwrap();
         ctx.set("BAR", "foo", false, false).unwrap();
 
         let mut current_headline = None;
 
-        assert_eq!(
-            parse_stdout(input, command_prefix, &mut ctx, &mut current_headline),
-            expect_handled
-        );
-
-        assert_eq!(ctx.printer().error_count() != 0, expect_error);
-
+        match parse_stdout(input, command_prefix, &mut ctx, &mut current_headline) {
+            Ok(h) => {
+                assert!(!expect_error);
+                assert_eq!(h, expect_handled);
+            }
+            Err(_) => assert!(expect_error),
+        };
         ctx
     }
 

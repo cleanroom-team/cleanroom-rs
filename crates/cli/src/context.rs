@@ -4,14 +4,12 @@
 //! The `Context` to run in
 
 use crate::commands::{CommandName, VariableName};
-#[cfg(test)]
-use crate::printer::{LogLevel, Printer};
+use crate::printer::Printer;
 
 use std::{
     collections::BTreeMap,
     ffi::{OsStr, OsString},
     path::{Path, PathBuf},
-    rc::Rc,
 };
 
 use anyhow::{anyhow, Context as AhContext};
@@ -120,9 +118,32 @@ impl ContextMap {
 pub struct ContextBuilder {
     timestamp: String,
     version: Option<String>,
+    printer: Printer,
+    commands: crate::commands::CommandManager,
 }
 
 impl ContextBuilder {
+    #[cfg(test)]
+    pub fn new_test() -> Self {
+        use crate::printer::LogLevel;
+
+        Self {
+            timestamp: format!("{}", chrono::Local::now().format("%Y%m%d.%H%M")),
+            version: None,
+            printer: Printer::new(&LogLevel::Off, false),
+            commands: crate::commands::CommandManagerBuilder::default().build(),
+        }
+    }
+
+    pub fn new(printer: Printer, commands: crate::commands::CommandManager) -> Self {
+        Self {
+            timestamp: format!("{}", chrono::Local::now().format("%Y%m%d.%H%M")),
+            version: None,
+            printer,
+            commands,
+        }
+    }
+
     pub fn timestamp(mut self, timestamp: String) -> anyhow::Result<Self> {
         let timestamp = timestamp.trim();
 
@@ -145,14 +166,22 @@ impl ContextBuilder {
         }
     }
 
-    pub fn build(self) -> Context {
+    pub fn build(self) -> anyhow::Result<Context> {
         let v = if let Some(v) = self.version {
             v.clone()
         } else {
             self.timestamp.clone()
         };
 
-        Context {
+        let myself = std::env::current_exe().context("Failed to find current executable path")?;
+        let myself = myself
+            .canonicalize()
+            .context("Failed to canonicalize my own binary path")?;
+        if !util::is_executable_file(&myself) {
+            return Err(anyhow!("{myself:?} is no file or not executable"));
+        }
+
+        Ok(Context {
             variables: ContextMap(BTreeMap::from([
                 (
                     OsString::from(TIMESTAMP),
@@ -170,28 +199,31 @@ impl ContextBuilder {
                         is_internal: false,
                     },
                 ),
+                (
+                    OsString::from(MY_BINARY),
+                    ContextData {
+                        value: myself.into_os_string(),
+                        is_read_only: true,
+                        is_internal: true,
+                    },
+                ),
             ])),
-        }
-    }
-}
-
-impl Default for ContextBuilder {
-    fn default() -> Self {
-        Self {
-            timestamp: format!("{}", chrono::Local::now().format("%Y%m%d.%H%M")),
-            version: None,
-        }
+            printer: self.printer,
+            commands: self.commands,
+        })
     }
 }
 
 #[derive(Clone, Debug)]
 pub struct Context {
     variables: ContextMap,
+    printer: Printer,
+    commands: crate::commands::CommandManager,
 }
 
 pub struct BuildContext {
+    printer: Printer,
     commands: crate::commands::CommandManager,
-    printer: Rc<crate::printer::Printer>,
     bootstrap_environment: crate::RunEnvironment,
     variables: ContextMap,
     networked_phases: Vec<crate::Phases>,
@@ -210,15 +242,10 @@ const WORK_DIR: &str = "WORK_DIR";
 
 impl Context {
     #[cfg(test)]
-    pub fn test_system(&self, log_level: &LogLevel) -> BuildContext {
-        use crate::commands::CommandManagerBuilder;
-
-        let printer = Rc::new(Printer::new(log_level, false));
-        let commands = CommandManagerBuilder::default().build();
-
+    pub fn test_system(&self) -> BuildContext {
         let mut ctx = BuildContext {
-            commands,
-            printer,
+            commands: self.commands.clone(),
+            printer: self.printer.clone(),
             variables: self.variables.clone(),
             bootstrap_environment: crate::RunEnvironment::Directory(PathBuf::from(
                 "/tmp/bootstrap_dir",
@@ -231,7 +258,6 @@ impl Context {
 
         ctx.set(BUSYBOX_BINARY, "/usr/bin/busybox", true, true)
             .unwrap();
-        ctx.set(MY_BINARY, "/foo/agent", true, true).unwrap();
         ctx.set(ARTIFACTS_DIR, "/foo/artifacts", true, true)
             .unwrap();
         ctx.set(ROOT_DIR, "/foo/work/XXXX/root_fs", true, true)
@@ -242,15 +268,11 @@ impl Context {
     }
 
     // Setter:
-    #[allow(clippy::too_many_arguments)]
     pub fn create_build_context(
         &self,
-        commands: crate::commands::CommandManager,
-        printer: Rc<crate::printer::Printer>,
         work_directory: &Path,
         artifacts_directory: &Path,
         busybox_binary: &Path,
-        myself: &Path,
         bootstrap_environment: crate::RunEnvironment,
         networked_phases: &[crate::Phases],
         debug_options: &[crate::DebugOptions],
@@ -274,13 +296,6 @@ impl Context {
             return Err(anyhow!("{busybox_binary:?} is no file or not executable"));
         }
 
-        let myself = myself
-            .canonicalize()
-            .context("Failed to canonicalize my own binary path")?;
-        if !util::is_executable_file(&myself) {
-            return Err(anyhow!("{myself:?} is no file or not executable"));
-        }
-
         let mut networked_phases = networked_phases.to_vec();
         networked_phases.sort_unstable();
         networked_phases.dedup();
@@ -294,8 +309,8 @@ impl Context {
         };
 
         let mut ctx = BuildContext {
-            commands,
-            printer,
+            commands: self.commands.clone(),
+            printer: self.printer.clone(),
             variables: self.variables.clone(),
             bootstrap_environment,
             networked_phases,
@@ -305,8 +320,6 @@ impl Context {
         };
 
         ctx.set_raw(BUSYBOX_BINARY, busybox_binary.as_os_str(), true, true)
-            .unwrap();
-        ctx.set_raw(MY_BINARY, myself.as_os_str(), true, true)
             .unwrap();
         ctx.set_raw(ARTIFACTS_DIR, artifacts_directory.as_os_str(), true, true)
             .unwrap();
@@ -394,7 +407,7 @@ impl BuildContext {
     pub fn bootstrap_environment(&self) -> &RunEnvironment {
         &self.bootstrap_environment
     }
-    pub fn printer(&self) -> Rc<crate::printer::Printer> {
+    pub fn printer(&self) -> crate::printer::Printer {
         self.printer.clone()
     }
 
