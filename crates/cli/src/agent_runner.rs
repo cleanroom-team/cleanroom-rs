@@ -124,6 +124,14 @@ fn mount_root_fs(phase: &Phases) -> bool {
     phase != &Phases::TestArtifacts
 }
 
+fn main_artifact_location(ctx: &BuildContext, command: &CommandName) -> anyhow::Result<PathBuf> {
+    let artifact_directory = ctx
+        .artifacts_directory()
+        .ok_or(anyhow!("No artifacts directory"))?;
+    let version = ctx.version();
+    Ok(artifact_directory.join(format!("{version}/{}", command)))
+}
+
 fn create_runner(
     ctx: &BuildContext,
     command: &CommandName,
@@ -131,7 +139,7 @@ fn create_runner(
     extra_bindings: &[String],
 ) -> anyhow::Result<Runner<contained_command::Nspawn>> {
     let p = ctx.printer();
-    let artifacts_fs = "/tmp/clrm/artifacts_fs";
+    let contained_artifacts = "/tmp/clrm/artifacts";
 
     let _hl = p.push_headline(&format!("Create \"{phase}\""), true);
     let agent_script =
@@ -196,12 +204,18 @@ fn create_runner(
 
     if mount_artifacts_directory(phase) {
         flags.push("ARTIFACTS");
+        let artifacts_directory = main_artifact_location(ctx, command)?;
+
+        std::fs::create_dir_all(&artifacts_directory).context(format!(
+            "Failed to create artifacts directory at {artifacts_directory:?}"
+        ))?;
+
         runner = runner
             .binding(Binding::rw(
-                &ctx.artifacts_directory().unwrap(),
-                &PathBuf::from(artifacts_fs),
+                &artifacts_directory,
+                &PathBuf::from(contained_artifacts),
             ))
-            .env("ARTIFACTS_FS", artifacts_fs)
+            .env("ARTIFACTS_DIR", contained_artifacts)
     }
 
     Ok(runner.description(flags.join(", ").to_string()))
@@ -311,10 +325,13 @@ pub async fn run_build_agent(
         } else {
             run_agent_phase(ctx, command, phase, extra_bindings).await?;
             let dependencies = ctx.take_dependencies();
+            let artifacts_dir = main_artifact_location(ctx, command)?;
 
             for (name, command) in dependencies {
                 let _hl =
                     p.push_headline(&format!("Building Dependency {name} => {command}"), true);
+
+                let _dep_ctx = ctx.create_dependent_context(&artifacts_dir, &name);
             }
         }
     }

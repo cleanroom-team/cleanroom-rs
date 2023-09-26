@@ -25,7 +25,6 @@ script = """
         export_constant MACHINE_ID "${machine_id}"
     elif [ "${CURRENT_PHASE}" = "${PHASE_BUILD_ARTIFACTS}" ]; then
         test -z "${ARTIFACTS_FS}" && error "ARTIFACTS_FS is not set"
-        export_constant ARTIFACT_DIR "${ARTIFACTS_FS}/${host_name}/${VERSION}"
         bb_mkdir -p "${ARTIFACT_DIR}"
     elif [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
         cat <<EOF > /etc/machine.info

@@ -28,6 +28,7 @@ struct ContextData {
     value: OsString,
     is_read_only: bool,
     is_internal: bool,
+    can_inherit: bool,
 }
 
 #[derive(Clone, Debug)]
@@ -69,8 +70,15 @@ impl ContextMap {
         value: &str,
         is_read_only: bool,
         is_internal: bool,
+        can_inherit: bool,
     ) -> anyhow::Result<()> {
-        self.set_raw(name, &OsString::from(value), is_read_only, is_internal)
+        self.set_raw(
+            name,
+            &OsString::from(value),
+            is_read_only,
+            is_internal,
+            can_inherit,
+        )
     }
 
     fn set_raw(
@@ -79,6 +87,7 @@ impl ContextMap {
         value: &OsStr,
         is_read_only: bool,
         is_internal: bool,
+        can_inherit: bool,
     ) -> anyhow::Result<()> {
         if name
             .chars()
@@ -97,12 +106,22 @@ impl ContextMap {
                     value: value.to_os_string(),
                     is_read_only,
                     is_internal,
+                    can_inherit,
                 },
             );
             Ok(())
         } else {
             Err(anyhow!("Invalid character in variable name \"{name}\""))
         }
+    }
+
+    fn inherit(&self) -> Self {
+        Self(
+            self.iter()
+                .filter(|(_, v)| !v.can_inherit)
+                .map(|(k, v)| (k.clone(), v.clone()))
+                .collect(),
+        )
     }
 
     fn is_empty(&self) -> bool {
@@ -189,6 +208,7 @@ impl ContextBuilder {
                         value: OsString::from(self.timestamp),
                         is_read_only: true,
                         is_internal: false,
+                        can_inherit: true,
                     },
                 ),
                 (
@@ -197,6 +217,7 @@ impl ContextBuilder {
                         value: OsString::from(v),
                         is_read_only: true,
                         is_internal: false,
+                        can_inherit: true,
                     },
                 ),
                 (
@@ -205,6 +226,7 @@ impl ContextBuilder {
                         value: myself.into_os_string(),
                         is_read_only: true,
                         is_internal: true,
+                        can_inherit: true,
                     },
                 ),
             ])),
@@ -246,7 +268,7 @@ impl Context {
         let mut ctx = BuildContext {
             commands: self.commands.clone(),
             printer: self.printer.clone(),
-            variables: self.variables.clone(),
+            variables: self.variables.inherit(),
             bootstrap_environment: crate::RunEnvironment::Directory(PathBuf::from(
                 "/tmp/bootstrap_dir",
             )),
@@ -256,13 +278,18 @@ impl Context {
             dependencies: vec![],
         };
 
-        ctx.set(BUSYBOX_BINARY, "/usr/bin/busybox", true, true)
+        ctx.variables
+            .set(BUSYBOX_BINARY, "/usr/bin/busybox", true, true, true)
             .unwrap();
-        ctx.set(ARTIFACTS_DIR, "/foo/artifacts", true, true)
+        ctx.variables
+            .set(ARTIFACTS_DIR, "/foo/artifacts", true, true, false)
             .unwrap();
-        ctx.set(ROOT_DIR, "/foo/work/XXXX/root_fs", true, true)
+        ctx.variables
+            .set(ROOT_DIR, "/foo/work/XXXX/root_fs", true, true, false)
             .unwrap();
-        ctx.set(WORK_DIR, "/foo/work", true, true).unwrap();
+        ctx.variables
+            .set(WORK_DIR, "/foo/work", true, true, false)
+            .unwrap();
 
         ctx
     }
@@ -311,7 +338,7 @@ impl Context {
         let mut ctx = BuildContext {
             commands: self.commands.clone(),
             printer: self.printer.clone(),
-            variables: self.variables.clone(),
+            variables: self.variables.inherit(),
             bootstrap_environment,
             networked_phases,
             scratch_dir,
@@ -319,13 +346,23 @@ impl Context {
             dependencies: Default::default(),
         };
 
-        ctx.set_raw(BUSYBOX_BINARY, busybox_binary.as_os_str(), true, true)
+        ctx.variables
+            .set_raw(BUSYBOX_BINARY, busybox_binary.as_os_str(), true, true, true)
             .unwrap();
-        ctx.set_raw(ARTIFACTS_DIR, artifacts_directory.as_os_str(), true, true)
+        ctx.variables
+            .set_raw(
+                ARTIFACTS_DIR,
+                artifacts_directory.as_os_str(),
+                true,
+                true,
+                false,
+            )
             .unwrap();
-        ctx.set_raw(ROOT_DIR, root_directory.as_os_str(), true, true)
+        ctx.variables
+            .set_raw(ROOT_DIR, root_directory.as_os_str(), true, true, false)
             .unwrap();
-        ctx.set_raw(WORK_DIR, work_directory.as_os_str(), true, true)
+        ctx.variables
+            .set_raw(WORK_DIR, work_directory.as_os_str(), true, true, false)
             .unwrap();
 
         Ok(ctx)
@@ -352,7 +389,8 @@ impl Context {
         is_read_only: bool,
         is_internal: bool,
     ) -> anyhow::Result<()> {
-        self.variables.set(name, value, is_read_only, is_internal)
+        self.variables
+            .set(name, value, is_read_only, is_internal, false)
     }
 }
 
@@ -401,6 +439,44 @@ impl BuildContext {
         self.dependencies.push((key, value));
 
         Ok(())
+    }
+
+    pub fn create_dependent_context(
+        &self,
+        artifacts_dir: &Path,
+        name: &VariableName,
+    ) -> anyhow::Result<Self> {
+        let artifacts_directory = artifacts_dir.join(format!("deps/{}", name));
+        std::fs::create_dir_all(&artifacts_directory)
+            .context(format!("Failed to create artifact directory for {name}"))?;
+
+        let scratch_dir =
+            tempfile::TempDir::with_prefix_in(format!("{}-", name), &self.scratch_dir)
+                .context("Failed to create scratch directory")?;
+
+        let root_dir = scratch_dir.path().join("root_fs");
+
+        let mut dep_ctx = BuildContext {
+            commands: self.commands.clone(),
+            printer: self.printer.clone(),
+            variables: self.variables.inherit(),
+            bootstrap_environment: self.bootstrap_environment.clone(),
+            networked_phases: self.networked_phases.clone(),
+            scratch_dir,
+            debug_options: self.debug_options.clone(),
+            dependencies: Default::default(),
+        };
+
+        dep_ctx
+            .set_raw(ROOT_DIR, root_dir.as_os_str(), true, true)
+            .unwrap();
+        dep_ctx
+            .set_raw(WORK_DIR, self.scratch_dir.path().as_os_str(), true, true)
+            .unwrap();
+        dep_ctx
+            .set_raw(ARTIFACTS_DIR, artifacts_directory.as_os_str(), true, true)
+            .unwrap();
+        Ok(dep_ctx)
     }
 
     // Getters:
@@ -459,7 +535,8 @@ impl BuildContext {
         is_read_only: bool,
         is_internal: bool,
     ) -> anyhow::Result<()> {
-        self.variables.set(name, value, is_read_only, is_internal)
+        self.variables
+            .set(name, value, is_read_only, is_internal, false)
     }
 
     pub fn set_raw(
@@ -470,7 +547,7 @@ impl BuildContext {
         is_internal: bool,
     ) -> anyhow::Result<()> {
         self.variables
-            .set_raw(name, value, is_read_only, is_internal)
+            .set_raw(name, value, is_read_only, is_internal, false)
     }
 
     pub fn iter(&self) -> impl Iterator<Item = ContextEntry> + '_ {
