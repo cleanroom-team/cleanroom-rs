@@ -152,16 +152,16 @@ fn create_command_manager(
 
 fn create_build_context(
     printer: Printer,
-    run: &BuildCommand,
+    build: &BuildCommand,
     extra_command_path: &[PathBuf],
 ) -> anyhow::Result<cli::context::BuildContext> {
     let base_ctx = {
         let mut builder =
             cli::context::ContextBuilder::new(printer, create_command_manager(extra_command_path)?);
-        if let Some(ts) = &run.timestamp {
+        if let Some(ts) = &build.timestamp {
             builder = builder.timestamp(ts.clone())?;
         }
-        if let Some(v) = &run.artifact_version {
+        if let Some(v) = &build.artifact_version {
             builder = builder.version(v.clone())?;
         }
 
@@ -169,20 +169,21 @@ fn create_build_context(
     };
 
     let bootstrap_environment =
-        cli::RunEnvironment::new(&run.bootstrap_directory, &run.bootstrap_image)?;
+        cli::RunEnvironment::new(&build.bootstrap_directory, &build.bootstrap_image)?;
 
     let debug_options = {
         static DEFAULT: Vec<DebugOptions> = vec![];
-        run.debug_options.as_ref().unwrap_or(&DEFAULT)
+        build.debug_options.as_ref().unwrap_or(&DEFAULT)
     };
 
     let ctx = base_ctx
         .create_build_context(
-            &run.work_directory,
-            &run.artifacts_directory,
-            &run.busybox_binary,
+            &build.command,
+            &build.work_directory,
+            &build.artifacts_directory,
+            &build.busybox_binary,
             bootstrap_environment,
-            &run.networked_phases,
+            &build.networked_phases,
             debug_options,
         )
         .context("Failed to set up system context")?;

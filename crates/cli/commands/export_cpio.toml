@@ -1,0 +1,14 @@
+[command]
+help = """
+Generate and export an cpio file (typically an initrd)
+"""
+inputs = [{ name = "file_name", help = "The cpio file name to export into" }]
+
+script = """
+    if [ "${CURRENT_PHASE}" = "${PHASE_BUILD_ARTIFACTS}" ]; then
+        FN="${ARTIFACTS_DIR}/${file_name}"
+        echo "CPIO package are not yet implemented!"
+        touch "${FN}"
+        export_constant "ARTIFACT_CPIO_ARCHIVE" "${FN}"
+    fi
+"""

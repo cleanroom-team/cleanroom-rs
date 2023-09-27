@@ -23,9 +23,6 @@ script = """
         export_constant HOST_NAME "${host_name}"
         export_constant PRETTY_HOST_NAME "${pretty_name}"
         export_constant MACHINE_ID "${machine_id}"
-    elif [ "${CURRENT_PHASE}" = "${PHASE_BUILD_ARTIFACTS}" ]; then
-        test -z "${ARTIFACTS_FS}" && error "ARTIFACTS_FS is not set"
-        bb_mkdir -p "${ARTIFACT_DIR}"
     elif [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
         cat <<EOF > /etc/machine.info
 PRETTY_HOSTNAME="${pretty_name}"

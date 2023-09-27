@@ -15,8 +15,8 @@ script = """
               test -e "${kernel_path}" || error "Kernel not found at ${kernel_path}"
 
               export_constant KERNEL_VERSION "${kernel_version}"
-              mv "${kernel_path}" "${ARTIFACT_DIR}/vmlinuz"
-              export_constant KERNEL_PATH "${ARTIFACT_DIR}/vmlinuz"
+              mv "${kernel_path}" "${ARTIFACTS_DIR}/vmlinuz"
+              export_constant KERNEL_PATH "${ARTIFACTS_DIR}/vmlinuz"
            else
               error "No /usr/lib/modules directory: Can not find kernel I asked to install"
            fi

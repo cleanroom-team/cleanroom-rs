@@ -124,12 +124,6 @@ fn mount_root_fs(phase: &Phases) -> bool {
     phase != &Phases::TestArtifacts
 }
 
-fn main_artifact_location(ctx: &BuildContext, command: &CommandName) -> PathBuf {
-    let artifact_directory = ctx.artifacts_directory();
-    let version = ctx.version();
-    artifact_directory.join(format!("{version}/{}", command))
-}
-
 fn create_runner(
     ctx: &BuildContext,
     command: &CommandName,
@@ -206,7 +200,7 @@ fn create_runner(
 
     if mount_artifacts_directory(phase) {
         flags.push("ARTIFACTS");
-        let artifacts_directory = main_artifact_location(ctx, command);
+        let artifacts_directory = ctx.artifacts_directory();
 
         runner = runner
             .binding(Binding::rw(
@@ -323,24 +317,15 @@ pub async fn run_build_agent(
         } else {
             run_agent_phase(ctx, command, phase, extra_bindings).await?;
             let dependencies = ctx.take_dependencies();
-            let artifacts_dir = main_artifact_location(ctx, command);
 
             for (name, command) in dependencies {
                 let _hl =
                     p.push_headline(&format!("Building Dependency {name} => {command}"), true);
 
-                let mut dep_ctx = ctx
-                    .create_dependent_context(&artifacts_dir, &name)
-                    .context(format!(
-                        "Failed to create dependent context for dependency {name}"
-                    ))?;
-
-                std::fs::create_dir_all(dep_ctx.root_directory()).context(format!(
-                    "Failed to create root directory for dependency {name}"
+                let mut dep_ctx = ctx.create_dependent_context(&name).context(format!(
+                    "Failed to create dependent context for dependency {name}"
                 ))?;
-                std::fs::create_dir_all(main_artifact_location(&dep_ctx, &command)).context(
-                    format!("Failed to create artifact directory for dependency {name}"),
-                )?;
+
                 run_build_agent(&mut dep_ctx, &command, &None, extra_bindings)
                     .await
                     .context(format!(

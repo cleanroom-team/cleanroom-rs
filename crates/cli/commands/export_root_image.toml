@@ -9,7 +9,7 @@ script = """
     if [ "${CURRENT_PHASE}" = "${PHASE_BUILD_ARTIFACTS}" ]; then
         test -x /usr/bin/mkfs.erofs || error "mkfs.erofs not found"
 
-        root_image="${ARTIFACT_DIR}/root.img"
+        root_image="${ARTIFACTS_DIR}/root.img"
 
         /usr/bin/mkfs.erofs \
             -L "${VERSION}" \

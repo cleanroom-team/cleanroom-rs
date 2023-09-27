@@ -295,8 +295,10 @@ impl Context {
     }
 
     // Setter:
+    #[allow(clippy::too_many_arguments)]
     pub fn create_build_context(
         &self,
+        command: &CommandName,
         work_directory: &Path,
         artifacts_directory: &Path,
         busybox_binary: &Path,
@@ -304,8 +306,15 @@ impl Context {
         networked_phases: &[crate::Phases],
         debug_options: &[crate::DebugOptions],
     ) -> anyhow::Result<BuildContext> {
-        let artifacts_directory = util::resolve_directory(artifacts_directory)
+        let artifacts_base_directory = util::resolve_directory(artifacts_directory)
             .context("Failed to resolve work directory")?;
+
+        let artifacts_directory =
+            artifacts_base_directory.join(format!("{command}/{}", self.version()));
+        std::fs::create_dir_all(&artifacts_directory).context(format!(
+            "Failed to create artifacts directory {artifacts_directory:?}"
+        ))?;
+
         let work_directory =
             util::resolve_directory(work_directory).context("Failed to resolve work directory")?;
 
@@ -441,20 +450,20 @@ impl BuildContext {
         Ok(())
     }
 
-    pub fn create_dependent_context(
-        &self,
-        artifacts_dir: &Path,
-        name: &VariableName,
-    ) -> anyhow::Result<Self> {
-        let artifacts_directory = artifacts_dir.join(format!("deps/{}", name));
-        std::fs::create_dir_all(&artifacts_directory)
-            .context(format!("Failed to create artifact directory for {name}"))?;
+    pub fn create_dependent_context(&self, name: &VariableName) -> anyhow::Result<Self> {
+        let artifacts_directory = self.artifacts_directory().join(format!("deps/{}", name));
+        std::fs::create_dir_all(&artifacts_directory).context(format!(
+            "Failed to create artifact directory for dependency {name}"
+        ))?;
 
         let scratch_dir =
             tempfile::TempDir::with_prefix_in(format!("{}-", name), &self.scratch_dir)
                 .context("Failed to create scratch directory")?;
 
         let root_dir = scratch_dir.path().join("root_fs");
+        std::fs::create_dir_all(&root_dir).context(format!(
+            "Failed to create root directory for dependency {name}"
+        ))?;
 
         let mut dep_ctx = BuildContext {
             commands: self.commands.clone(),

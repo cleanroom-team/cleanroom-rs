@@ -48,8 +48,8 @@ script = """
 # Add opt:
 L /opt - - - - /usr/opt
 EOF
-        cat <<EOF > /usr/lib/tmpfiles.d/opt.conf
-# Add opt:
+        cat <<EOF > /usr/lib/tmpfiles.d/srv.conf
+# Add srv:
 d /var/srv 0755 root root -
 d /var/srv/ftp 0755 root root -
 d /var/srv/http 0755 root root -

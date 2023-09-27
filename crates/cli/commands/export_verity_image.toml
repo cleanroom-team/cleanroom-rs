@@ -9,7 +9,7 @@ script = """
     if [ "${CURRENT_PHASE}" = "${PHASE_BUILD_ARTIFACTS}" ]; then
         test -x /usr/bin/veritysetup || error "veritysetup not found"
 
-        vrty_image="${ARTIFACT_DIR}/vrty.img"
+        vrty_image="${ARTIFACTS_DIR}/vrty.img"
 
         output=$(/usr/bin/veritysetup format "${ARTIFACT_ROOT_IMAGE}" "${vrty_image}")
 

@@ -14,8 +14,8 @@ script = """
                 "${BUSYBOX}" find . ! -name usr -maxdepth 1 -exec rm -rf {} \\; )
         fi
 
-        cp --reflink=auto -r "${ROOT_FS}" "${ARTIFACT_DIR}/root_fs"
+        cp --reflink=auto -r "${ROOT_FS}" "${ARTIFACTS_DIR}/root_fs"
 
-        export_constant ARTIFACT_ROOT_FS "${ARTIFACT_DIR}/root_fs"
+        export_constant ARTIFACT_ROOT_FS "${ARTIFACTS_DIR}/root_fs"
     fi
 """

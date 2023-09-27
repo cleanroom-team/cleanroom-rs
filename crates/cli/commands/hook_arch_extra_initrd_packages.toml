@@ -1,0 +1,10 @@
+[command]
+help = """
+Install extra packages needed in an arch-based initrd
+
+Note that modules will be added separately!
+"""
+
+script = """
+    # add_packages busybox
+"""
