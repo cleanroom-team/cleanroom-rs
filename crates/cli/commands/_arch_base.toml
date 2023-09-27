@@ -21,7 +21,7 @@ script = """
 
 
     if [ "${CURRENT_PHASE}" = "${PHASE_PREPARE}" ]; then
-        add_dependency inird _arch_initrd
+        add_dependency initrd _arch_initrd
     elif [ "${CURRENT_PHASE}" = "${PHASE_POLISH}" ]; then
         # polish away files that make no sense in an immutable setup (or are handled by us!)
         rm -f \

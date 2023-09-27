@@ -118,7 +118,7 @@ impl ContextMap {
     fn inherit(&self) -> Self {
         Self(
             self.iter()
-                .filter(|(_, v)| !v.can_inherit)
+                .filter(|(_, v)| v.can_inherit)
                 .map(|(k, v)| (k.clone(), v.clone()))
                 .collect(),
         )
@@ -476,6 +476,7 @@ impl BuildContext {
         dep_ctx
             .set_raw(ARTIFACTS_DIR, artifacts_directory.as_os_str(), true, true)
             .unwrap();
+
         Ok(dep_ctx)
     }
 
@@ -487,20 +488,20 @@ impl BuildContext {
         self.printer.clone()
     }
 
-    pub fn artifacts_directory(&self) -> Option<PathBuf> {
-        self.get_raw(ARTIFACTS_DIR).map(PathBuf::from)
+    pub fn artifacts_directory(&self) -> PathBuf {
+        self.get_raw(ARTIFACTS_DIR).map(PathBuf::from).unwrap()
     }
 
-    pub fn busybox_binary(&self) -> Option<PathBuf> {
-        self.get_raw(BUSYBOX_BINARY).map(PathBuf::from)
+    pub fn busybox_binary(&self) -> PathBuf {
+        self.get_raw(BUSYBOX_BINARY).map(PathBuf::from).unwrap()
     }
 
-    pub fn my_binary(&self) -> Option<PathBuf> {
-        self.get_raw(MY_BINARY).map(PathBuf::from)
+    pub fn my_binary(&self) -> PathBuf {
+        self.get_raw(MY_BINARY).map(PathBuf::from).unwrap()
     }
 
-    pub fn root_directory(&self) -> Option<PathBuf> {
-        self.get_raw(ROOT_DIR).map(PathBuf::from)
+    pub fn root_directory(&self) -> PathBuf {
+        self.get_raw(ROOT_DIR).map(PathBuf::from).unwrap()
     }
 
     pub fn scratch_directory(&self) -> PathBuf {
@@ -515,8 +516,8 @@ impl BuildContext {
         self.get(VERSION).unwrap()
     }
 
-    pub fn work_directory(&self) -> Option<PathBuf> {
-        self.get_raw(WORK_DIR).map(PathBuf::from)
+    pub fn work_directory(&self) -> PathBuf {
+        self.get_raw(WORK_DIR).map(PathBuf::from).unwrap()
     }
 
     // Generic functions:

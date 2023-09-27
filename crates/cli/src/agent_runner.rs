@@ -124,12 +124,10 @@ fn mount_root_fs(phase: &Phases) -> bool {
     phase != &Phases::TestArtifacts
 }
 
-fn main_artifact_location(ctx: &BuildContext, command: &CommandName) -> anyhow::Result<PathBuf> {
-    let artifact_directory = ctx
-        .artifacts_directory()
-        .ok_or(anyhow!("No artifacts directory"))?;
+fn main_artifact_location(ctx: &BuildContext, command: &CommandName) -> PathBuf {
+    let artifact_directory = ctx.artifacts_directory();
     let version = ctx.version();
-    Ok(artifact_directory.join(format!("{version}/{}", command)))
+    artifact_directory.join(format!("{version}/{}", command))
 }
 
 fn create_runner(
@@ -144,6 +142,7 @@ fn create_runner(
     let _hl = p.push_headline(&format!("Create \"{phase}\""), true);
     let agent_script =
         crate::scripts::create_script(ctx, command).context("Failed to create agent script")?;
+    p.trace("Agent script: {agent_script:?}");
 
     let mut flags = vec![];
 
@@ -153,9 +152,14 @@ fn create_runner(
             .env("CLRM_CONTAINER", "bootstrap");
 
         if mount_root_fs(phase) {
+            let contained_root_fs = PathBuf::from("/tmp/clrm/root_fs");
+            p.trace(&format!(
+                "mounting {:?} to {contained_root_fs:?}",
+                ctx.root_directory()
+            ));
             runner = runner
                 .binding(Binding::rw(
-                    &ctx.root_directory().unwrap(),
+                    &ctx.root_directory(),
                     &PathBuf::from("/tmp/clrm/root_fs"),
                 ))
                 .env("ROOT_FS", "/tmp/clrm/root_fs")
@@ -163,13 +167,11 @@ fn create_runner(
         runner
     } else {
         flags.push("ROOT");
-        Nspawn::default_runner(RunEnvironment::Directory(
-            ctx.root_directory().unwrap().clone(),
-        ))?
-        // .binding(Binding::tmpfs(&PathBuf::from("/tmp")))
-        .env("CLRM_CONTAINER", "root_fs")
-        .env("ROOT_FS", "/")
-        .persistent_root()
+        Nspawn::default_runner(RunEnvironment::Directory(ctx.root_directory()))?
+            // .binding(Binding::tmpfs(&PathBuf::from("/tmp")))
+            .env("CLRM_CONTAINER", "root_fs")
+            .env("ROOT_FS", "/")
+            .persistent_root()
     };
 
     runner = if ctx.wants_network(phase) {
@@ -184,11 +186,11 @@ fn create_runner(
         .machine_id(DEFAULT_MACHINE_ID)
         .share_users()
         .binding(Binding::ro(
-            &ctx.my_binary().unwrap(),
+            &ctx.my_binary(),
             &PathBuf::from("/tmp/clrm/agent"),
         ))
         .binding(Binding::ro(
-            &ctx.busybox_binary().unwrap(),
+            &ctx.busybox_binary(),
             &PathBuf::from("/tmp/clrm/busybox"),
         ))
         .binding(Binding::ro(
@@ -204,11 +206,7 @@ fn create_runner(
 
     if mount_artifacts_directory(phase) {
         flags.push("ARTIFACTS");
-        let artifacts_directory = main_artifact_location(ctx, command)?;
-
-        std::fs::create_dir_all(&artifacts_directory).context(format!(
-            "Failed to create artifacts directory at {artifacts_directory:?}"
-        ))?;
+        let artifacts_directory = main_artifact_location(ctx, command);
 
         runner = runner
             .binding(Binding::rw(
@@ -270,7 +268,7 @@ pub async fn run_agent_phase(
     let p = ctx.printer();
     let runner = create_runner(ctx, command, phase, extra_bindings)?;
     let _hl = p.push_headline(
-        &format!("Running container in \"{phase}\" [{}]", runner.describe()),
+        &format!("Running Agent in \"{phase}\" [{}]", runner.describe()),
         false,
     );
 
@@ -307,6 +305,7 @@ pub async fn run_agent_phase(
     Ok(())
 }
 
+#[async_recursion::async_recursion(?Send)]
 pub async fn run_build_agent(
     ctx: &mut BuildContext,
     command: &CommandName,
@@ -314,7 +313,6 @@ pub async fn run_build_agent(
     extra_bindings: &[String],
 ) -> anyhow::Result<()> {
     let p = ctx.printer();
-    let _hl = p.push_headline("Run Agent", true);
 
     for phase in Phases::iter() {
         if ctx.check_debug_option(&crate::DebugOptions::PrintBuildContext) {
@@ -325,13 +323,29 @@ pub async fn run_build_agent(
         } else {
             run_agent_phase(ctx, command, phase, extra_bindings).await?;
             let dependencies = ctx.take_dependencies();
-            let artifacts_dir = main_artifact_location(ctx, command)?;
+            let artifacts_dir = main_artifact_location(ctx, command);
 
             for (name, command) in dependencies {
                 let _hl =
                     p.push_headline(&format!("Building Dependency {name} => {command}"), true);
 
-                let _dep_ctx = ctx.create_dependent_context(&artifacts_dir, &name);
+                let mut dep_ctx = ctx
+                    .create_dependent_context(&artifacts_dir, &name)
+                    .context(format!(
+                        "Failed to create dependent context for dependency {name}"
+                    ))?;
+
+                std::fs::create_dir_all(dep_ctx.root_directory()).context(format!(
+                    "Failed to create root directory for dependency {name}"
+                ))?;
+                std::fs::create_dir_all(main_artifact_location(&dep_ctx, &command)).context(
+                    format!("Failed to create artifact directory for dependency {name}"),
+                )?;
+                run_build_agent(&mut dep_ctx, &command, &None, extra_bindings)
+                    .await
+                    .context(format!(
+                        "Failed to build dependency {name}, running {command}"
+                    ))?;
             }
         }
     }
