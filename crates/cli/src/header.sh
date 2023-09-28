@@ -62,8 +62,8 @@ error() {
 }
 
 assert_distribution_initialized() {
-	if [ -z "${CLRM_BASE_DISTRIBUTION}" ]; then
-		error "Distribution not yet initialized. Call \"_distribution <id>\" first!"
+     	if [     -z "${CLRM_BASE_DISTRIBUTION}" ]; then
+    error "Distribution not yet initialized. Call \"_distribution <id>\" first!"
 	fi
 }
 

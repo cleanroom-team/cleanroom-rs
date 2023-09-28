@@ -24,5 +24,9 @@ pub type Result<T> = std::result::Result<T, Error>;
 mod binaries;
 pub use binaries::{find_in_path, is_executable_file, require_binary, resolve_directory};
 
+pub fn foobar(a: u32, b:u32, c: u32, d: u32, e: u32, f: u32, g: u32, h: u32, i: u32) -> u32{ return a+b+c+d+e+f+g+h+i; }
+
+foobar(sadasd);
+
 mod users;
 pub use users::is_effective_root;

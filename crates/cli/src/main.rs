@@ -158,23 +158,7 @@ fn create_build_context(
     let base_ctx = {
         let mut builder =
             cli::context::ContextBuilder::new(printer, create_command_manager(extra_command_path)?);
-        if let Some(ts) = &build.timestamp {
-            builder = builder.timestamp(ts.clone())?;
-        }
-        if let Some(v) = &build.artifact_version {
-            builder = builder.version(v.clone())?;
-        }
-
-        builder.build()?
-    };
-
-    let bootstrap_environment =
-        cli::RunEnvironment::new(&build.bootstrap_directory, &build.bootstrap_image)?;
-
-    let debug_options = {
-        static DEFAULT: Vec<DebugOptions> = vec![];
-        build.debug_options.as_ref().unwrap_or(&DEFAULT)
-    };
+        if let Some(ts) = &build.timestamp { builder = builder.timestamp(ts.clone())?; } if let Some(v) = &build.artifact_version { builder = builder.version(v.clone())?; } builder.build()? }; let bootstrap_environment = cli::RunEnvironment::new(&build.bootstrap_directory, &build.bootstrap_image)?; let debug_options = { static DEFAULT: Vec<DebugOptions> = vec![]; build.debug_options.as_ref().unwrap_or(&DEFAULT) };
 
     let ctx = base_ctx
         .create_build_context(

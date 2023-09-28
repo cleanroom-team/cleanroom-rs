@@ -1,5 +1,4 @@
-# Cleanroom
-
+#    Cleanroom
 Cleanroom is a way to build immutable Linux distribution images backed by
 strong cryptography. Any change to the image will be detected.
 
@@ -10,10 +9,12 @@ _Cleanroom is *linux only* and will not work on any other OS at this time_
 
 ## Requirements
 
+Froobinationnarwjkl test
+
 You will need to have the following binaries on the system you run cleanroom on:
 
-- The `cleanroom` command defined in this repository
-- `/usr/bin/systemd-nspawn` to set up containers with
+* The `cleanroom` command defined in this repository
+* `/usr/bin/systemd-nspawn` to set up containers with
 - `busybox` as a statically compiled binary as a OS agnostic run environment
   inside and outside of containers.
 
