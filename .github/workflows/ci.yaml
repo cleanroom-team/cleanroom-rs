@@ -14,6 +14,7 @@ on:
 jobs:
   cargo_fmt:
     runs-on: ubuntu-latest
+
     env:
       RUSTFLAGS: "-D warnings"
     steps:
@@ -27,26 +28,33 @@ jobs:
       - name: cargo version
         run: cargo +nightly --version
       - name: Run cargo fmt
-        run: cargo +nightly fmt
+        run: cargo +nightly fmt --check
 
   cargo_check:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust_version: [stable, nightly]
+        os: [ubuntu-latest]
+
+    runs-on: ${{matrix.os}}
+
     env:
       RUSTFLAGS: "-D warnings"
     steps:
       - uses: actions/checkout@v3
-      - name: Install rust (nightly)
+      - name: Install rust (${{matrix.rust_version}})
         uses: ./.github/actions/setup-rust
         with:
-          toolchain: nightly
+          toolchain: ${{matrix.rust_version}}
           key: cargo_check
       - name: cargo version
-        run: cargo +nightly --version
+        run: cargo +${{matrix.rust_version}} --version
       - name: Run cargo check
-        run: cargo +nightly check
+        run: cargo +${{matrix.rust_version}} check
 
   cargo_clippy:
     runs-on: ubuntu-latest
+
     env:
       RUSTFLAGS: "-D warnings"
     steps:
@@ -63,23 +71,43 @@ jobs:
         run: cargo +nightly clippy
 
   cargo_test:
-    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust_version: [stable, nightly]
+        os: [ubuntu-latest]
+
+    runs-on: ${{matrix.os}}
+
     env:
       RUSTFLAGS: "-D warnings"
     steps:
       - uses: actions/checkout@v3
-      - name: Install rust (nightly)
+      - name: Install rust (${{matrix.rust_version}})
         uses: ./.github/actions/setup-rust
         with:
-          toolchain: nightly
+          toolchain: ${{matrix.rust_version}}
           key: cargo_test
       - name: cargo version
-        run: cargo +nightly --version
+        run: cargo +${{matrix.rust_version}} --version
       - name: Run cargo test
-        run: cargo +nightly test
+        run: cargo +${{matrix.rust_version}} test
 
   spellcheck: # run the action
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
       - uses: streetsidesoftware/cspell-action@v3
+
+  prettier:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: creyD/prettier_action@v4.3
+        with:
+          prettier_options: --check --ignore-unknown .
+
+  sh-checker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: luizm/action-sh-checker@master

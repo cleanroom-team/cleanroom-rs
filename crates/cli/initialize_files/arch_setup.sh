@@ -37,7 +37,7 @@ shift
 ## Arch:
 
 pch="hook_write_pacman_conf"
-"${cleanroom}" dump-command "${pch}" > "commands/${pch}.dump"
+"${cleanroom}" dump-command "${pch}" >"commands/${pch}.dump"
 mv "commands/${pch}.dump" "commands/${pch}.toml"
 
 ## Set up Git:
